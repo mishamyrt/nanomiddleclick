@@ -24,6 +24,7 @@ impl Point {
 pub struct GestureEngine {
     config: Config,
     required_touch_down: bool,
+    click_rewrite_deadline: Option<Instant>,
     rewritten_mouse_down_active: bool,
     natural_middle_click_last_time: Option<Instant>,
     touch_start_time: Option<Instant>,
@@ -36,6 +37,7 @@ impl GestureEngine {
         Self {
             config,
             required_touch_down: false,
+            click_rewrite_deadline: None,
             rewritten_mouse_down_active: false,
             natural_middle_click_last_time: None,
             touch_start_time: None,
@@ -55,6 +57,7 @@ impl GestureEngine {
 
     pub fn cancel_current_touch_sequence(&mut self) {
         self.required_touch_down = false;
+        self.click_rewrite_deadline = None;
         self.touch_start_time = None;
         self.start_centroid = None;
         self.latest_centroid = None;
@@ -66,13 +69,22 @@ impl GestureEngine {
     }
 
     pub fn handle_touch_frame(&mut self, touches: &[RawTouch]) -> GestureOutcome {
-        let touch_count = touches.len();
+        let now = Instant::now();
+        let touch_count = self.active_touch_count(touches);
         let matches_required_fingers =
             self.count_matches_required_fingers(touch_count);
         self.required_touch_down = matches_required_fingers;
 
+        if matches_required_fingers {
+            self.click_rewrite_deadline = Some(now + click_rewrite_grace());
+        }
+
         if touch_count == 0 {
-            return self.finish_touch_sequence();
+            let outcome = self.finish_touch_sequence();
+            if outcome == GestureOutcome::EmulateMiddleClick {
+                self.click_rewrite_deadline = None;
+            }
+            return outcome;
         }
 
         if !self.config.tap_to_click {
@@ -109,12 +121,14 @@ impl GestureEngine {
     }
 
     pub fn handle_mouse_event(&mut self, kind: MouseEventKind) -> MouseAction {
+        let click_eligible = self.required_touch_down || self.has_recent_click_touch();
         match kind {
             MouseEventKind::LeftDown | MouseEventKind::RightDown
-                if self.required_touch_down =>
+                if click_eligible =>
             {
                 self.rewritten_mouse_down_active = true;
                 self.required_touch_down = false;
+                self.click_rewrite_deadline = None;
                 self.natural_middle_click_last_time = Some(Instant::now());
                 MouseAction::RewriteDown
             }
@@ -170,13 +184,18 @@ impl GestureEngine {
     }
 
     fn centroid_for_touch_subset(&self, touches: &[RawTouch]) -> Point {
-        let sample_count = self.config.fingers.min(touches.len());
-        let sample = &touches[..sample_count];
+        let sample_count = self
+            .active_touch_count(touches)
+            .min(self.config.fingers);
         let sample_count =
             u32::try_from(sample_count).expect("finger count should fit into u32");
 
         let mut sum = Point::default();
-        for touch in sample {
+        for touch in touches
+            .iter()
+            .filter(|touch| is_touch_contact_stage(touch.stage))
+            .take(self.config.fingers)
+        {
             sum.x += f64::from(touch.normalized_vector.position.x);
             sum.y += f64::from(touch.normalized_vector.position.y);
         }
@@ -195,6 +214,26 @@ impl GestureEngine {
         last_natural_click.elapsed()
             <= scale_duration(self.config.max_time_delta, 3, 4)
     }
+
+    fn has_recent_click_touch(&mut self) -> bool {
+        let Some(deadline) = self.click_rewrite_deadline else {
+            return false;
+        };
+
+        if Instant::now() <= deadline {
+            return true;
+        }
+
+        self.click_rewrite_deadline = None;
+        false
+    }
+
+    fn active_touch_count(&self, touches: &[RawTouch]) -> usize {
+        touches
+            .iter()
+            .filter(|touch| is_touch_contact_stage(touch.stage))
+            .count()
+    }
 }
 
 fn scale_duration(duration: Duration, numerator: u32, denominator: u32) -> Duration {
@@ -203,9 +242,20 @@ fn scale_duration(duration: Duration, numerator: u32, denominator: u32) -> Durat
     )
 }
 
+fn click_rewrite_grace() -> Duration {
+    Duration::from_millis(75)
+}
+
+fn is_touch_contact_stage(stage: i32) -> bool {
+    (3..=5).contains(&stage)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const TOUCH_STAGE_MAKE_TOUCH: i32 = 3;
+    const TOUCH_STAGE_HOVER_IN_RANGE: i32 = 2;
 
     fn config() -> Config {
         Config {
@@ -219,7 +269,16 @@ mod tests {
     }
 
     fn touch(x: f32, y: f32) -> RawTouch {
+        touch_with_stage(x, y, TOUCH_STAGE_MAKE_TOUCH)
+    }
+
+    fn hover_touch(x: f32, y: f32) -> RawTouch {
+        touch_with_stage(x, y, TOUCH_STAGE_HOVER_IN_RANGE)
+    }
+
+    fn touch_with_stage(x: f32, y: f32, stage: i32) -> RawTouch {
         RawTouch {
+            stage,
             normalized_vector: crate::ffi::RawVector {
                 position: crate::ffi::RawPoint { x, y },
                 velocity: crate::ffi::RawPoint { x: 0.0, y: 0.0 },
@@ -244,6 +303,39 @@ mod tests {
         assert_eq!(
             engine.handle_mouse_event(MouseEventKind::LeftUp),
             MouseAction::RewriteUp
+        );
+    }
+
+    #[test]
+    fn rewrites_mouse_down_after_brief_touch_drop_before_click() {
+        let mut engine = GestureEngine::new(config());
+        engine.handle_touch_frame(&[
+            touch(0.1, 0.1),
+            touch(0.2, 0.2),
+            touch(0.3, 0.3),
+        ]);
+        engine.handle_touch_frame(&[touch(0.1, 0.1), touch(0.2, 0.2)]);
+
+        assert_eq!(
+            engine.handle_mouse_event(MouseEventKind::LeftDown),
+            MouseAction::RewriteDown
+        );
+    }
+
+    #[test]
+    fn does_not_rewrite_mouse_down_after_touch_grace_expires() {
+        let mut engine = GestureEngine::new(config());
+        engine.handle_touch_frame(&[
+            touch(0.1, 0.1),
+            touch(0.2, 0.2),
+            touch(0.3, 0.3),
+        ]);
+        engine.handle_touch_frame(&[touch(0.1, 0.1), touch(0.2, 0.2)]);
+        std::thread::sleep(Duration::from_millis(100));
+
+        assert_eq!(
+            engine.handle_mouse_event(MouseEventKind::LeftDown),
+            MouseAction::Pass
         );
     }
 
@@ -310,6 +402,22 @@ mod tests {
         assert_eq!(
             engine.handle_mouse_event(MouseEventKind::LeftDown),
             MouseAction::Pass
+        );
+    }
+
+    #[test]
+    fn ignores_hovering_paths_when_counting_click_fingers() {
+        let mut engine = GestureEngine::new(config());
+        engine.handle_touch_frame(&[
+            touch(0.1, 0.1),
+            touch(0.2, 0.2),
+            touch(0.3, 0.3),
+            hover_touch(0.4, 0.4),
+        ]);
+
+        assert_eq!(
+            engine.handle_mouse_event(MouseEventKind::LeftDown),
+            MouseAction::RewriteDown
         );
     }
 
