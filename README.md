@@ -2,6 +2,12 @@
 
 Minimal Rust + Objective-C daemon that emulates MiddleClick-style middle mouse clicks from macOS multitouch gestures.
 
+## Workspace layout
+
+- `nanomiddleclick-core`: gesture/domain logic and config normalization.
+- `nanomiddleclick-platform`: macOS integration, Objective-C shim, and safe Rust wrappers.
+- `nanomiddleclick-daemon`: daemon wiring, runtime state, and logging.
+
 ## What it implements
 
 - Physical click rewrite: when the configured finger count is down, left/right click is rewritten to center click.
@@ -16,7 +22,7 @@ Minimal Rust + Objective-C daemon that emulates MiddleClick-style middle mouse c
 cargo build --release
 ```
 
-The build uses a local Objective-C shim compiled by `build.rs`, and links against macOS frameworks plus the private `MultitouchSupport.framework`.
+The macOS platform crate compiles its local Objective-C shim from `nanomiddleclick-platform/shim/` and links against macOS frameworks plus the private `MultitouchSupport.framework`.
 
 ## Defaults domain
 

@@ -1,0 +1,11 @@
+[package]
+name = "nanomiddleclick-platform"
+version = "0.1.0"
+edition = "2024"
+build = "build.rs"
+
+[dependencies]
+nanomiddleclick-core = { path = "../nanomiddleclick-core" }
+
+[lints]
+workspace = true

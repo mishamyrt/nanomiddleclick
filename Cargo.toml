@@ -1,15 +1,12 @@
-[package]
-name = "nanomiddleclick"
-version = "0.1.0"
-edition = "2024"
+[workspace]
+members = [
+    "nanomiddleclick-core",
+    "nanomiddleclick-platform",
+    "nanomiddleclick-daemon",
+]
+resolver = "3"
 
-[[bin]]
-name = "nanomiddleclickd"
-path = "src/main.rs"
-
-[dependencies]
-
-[lints.clippy]
+[workspace.lints.clippy]
 pedantic = { level = "warn", priority = -2 }
 # Allowed pedantic lints
 char_lit_as_u8 = "allow"

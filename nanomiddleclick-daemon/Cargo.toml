@@ -1,0 +1,15 @@
+[package]
+name = "nanomiddleclick-daemon"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "nanomiddleclickd"
+path = "src/main.rs"
+
+[dependencies]
+nanomiddleclick-core = { path = "../nanomiddleclick-core" }
+nanomiddleclick-platform = { path = "../nanomiddleclick-platform" }
+
+[lints]
+workspace = true

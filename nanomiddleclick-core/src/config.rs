@@ -1,9 +1,6 @@
 use std::fmt;
 use std::time::Duration;
 
-use crate::ffi;
-
-pub const DEFAULTS_DOMAIN: &str = "co.myrt.nanomiddleclick";
 const DEFAULT_FINGERS: usize = 3;
 const DEFAULT_ALLOW_MORE_FINGERS: bool = false;
 const DEFAULT_MAX_DISTANCE_DELTA: f64 = 0.05;
@@ -20,49 +17,48 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn load() -> Result<Self, String> {
-        let snapshot = ffi::load_config_snapshot()?;
-
-        let fingers = match usize::try_from(snapshot.fingers) {
+    pub fn from_raw_parts(
+        fingers: i64,
+        allow_more_fingers: bool,
+        max_distance_delta: f64,
+        max_time_delta_ms: i64,
+        tap_to_click: bool,
+        ignored_app_bundles: Box<[Box<str>]>,
+    ) -> Self {
+        let fingers = match usize::try_from(fingers) {
             Ok(value) if value > 0 => value,
             _ => DEFAULT_FINGERS,
         };
 
-        let max_distance_delta = if snapshot.max_distance_delta.is_finite()
-            && snapshot.max_distance_delta >= 0.0
-        {
-            snapshot.max_distance_delta
-        } else {
-            DEFAULT_MAX_DISTANCE_DELTA
-        };
+        let max_distance_delta =
+            if max_distance_delta.is_finite() && max_distance_delta >= 0.0 {
+                max_distance_delta
+            } else {
+                DEFAULT_MAX_DISTANCE_DELTA
+            };
 
-        let max_time_delta_ms = match u64::try_from(snapshot.max_time_delta_ms) {
+        let max_time_delta_ms = match u64::try_from(max_time_delta_ms) {
             Ok(value) if value > 0 => value,
             _ => DEFAULT_MAX_TIME_DELTA_MS,
         };
 
-        Ok(Self {
+        Self {
             fingers,
-            allow_more_fingers: snapshot.allow_more_fingers,
+            allow_more_fingers,
             max_distance_delta,
             max_time_delta: Duration::from_millis(max_time_delta_ms),
-            tap_to_click: snapshot.tap_to_click,
-            ignored_app_bundles: snapshot
-                .ignored_app_bundles
-                .into_iter()
-                .map(String::into_boxed_str)
-                .collect::<Vec<_>>()
-                .into_boxed_slice(),
-        })
+            tap_to_click,
+            ignored_app_bundles,
+        }
     }
 
-    pub fn fallback() -> Self {
+    pub fn fallback(system_tap_to_click: bool) -> Self {
         Self {
             fingers: DEFAULT_FINGERS,
             allow_more_fingers: DEFAULT_ALLOW_MORE_FINGERS,
             max_distance_delta: DEFAULT_MAX_DISTANCE_DELTA,
             max_time_delta: Duration::from_millis(DEFAULT_MAX_TIME_DELTA_MS),
-            tap_to_click: ffi::system_tap_to_click(),
+            tap_to_click: system_tap_to_click,
             ignored_app_bundles: Vec::new().into_boxed_slice(),
         }
     }
