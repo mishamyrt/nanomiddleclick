@@ -18,6 +18,10 @@ fn main() -> ExitCode {
             run_daemon();
             ExitCode::SUCCESS
         }
+        Ok(Command::Version) => {
+            println!("{}", env!("CARGO_PKG_VERSION"));
+            ExitCode::SUCCESS
+        }
         Ok(Command::DaemonOn) => match env::current_exe() {
             Ok(executable_path) => match launchd::install(&executable_path) {
                 Ok(plist_path) => {
@@ -89,6 +93,7 @@ fn run_daemon() {
 #[derive(Debug, PartialEq, Eq)]
 enum Command {
     Run { verbose: bool },
+    Version,
     DaemonOn,
     DaemonOff,
 }
@@ -98,6 +103,7 @@ fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Command, String>
     match args.as_slice() {
         [] => Ok(Command::Run { verbose: false }),
         [flag] if flag == "-v" => Ok(Command::Run { verbose: true }),
+        [command] if command == "version" => Ok(Command::Version),
         [command, state] if command == "daemon" => {
             if state == "on" {
                 Ok(Command::DaemonOn)
@@ -112,7 +118,7 @@ fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Command, String>
 }
 
 fn usage() -> &'static str {
-    "usage: nanomiddleclick [-v] | nanomiddleclick daemon <on|off>"
+    "usage: nanomiddleclick [-v] | nanomiddleclick version | nanomiddleclick daemon <on|off>"
 }
 
 #[cfg(test)]
@@ -141,6 +147,11 @@ mod tests {
             parse_args(vec!["daemon".to_owned(), "on".to_owned()]),
             Ok(Command::DaemonOn)
         );
+    }
+
+    #[test]
+    fn parse_args_supports_version() {
+        assert_eq!(parse_args(vec!["version".to_owned()]), Ok(Command::Version));
     }
 
     #[test]

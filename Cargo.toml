@@ -5,11 +5,16 @@ members = [
   "nanomiddleclick-launchd",
   "nanomiddleclick",
 ]
+default-members = ["nanomiddleclick"]
 resolver = "3"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
 
 [workspace.lints.clippy]
 pedantic = { level = "warn", priority = -2 }
-# Allowed pedantic lints
 char_lit_as_u8 = "allow"
 collapsible_else_if = "allow"
 collapsible_if = "allow"
