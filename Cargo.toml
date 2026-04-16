@@ -1,8 +1,9 @@
 [workspace]
 members = [
-    "nanomiddleclick-core",
-    "nanomiddleclick-platform",
-    "nanomiddleclick-daemon",
+  "nanomiddleclick-core",
+  "nanomiddleclick-platform",
+  "nanomiddleclick-launchd",
+  "nanomiddleclick",
 ]
 resolver = "3"
 

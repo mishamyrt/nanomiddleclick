@@ -3,16 +3,21 @@
 version = 4
 
 [[package]]
+name = "nanomiddleclick"
+version = "0.1.0"
+dependencies = [
+ "nanomiddleclick-core",
+ "nanomiddleclick-launchd",
+ "nanomiddleclick-platform",
+]
+
+[[package]]
 name = "nanomiddleclick-core"
 version = "0.1.0"
 
 [[package]]
-name = "nanomiddleclick-daemon"
+name = "nanomiddleclick-launchd"
 version = "0.1.0"
-dependencies = [
- "nanomiddleclick-core",
- "nanomiddleclick-platform",
-]
 
 [[package]]
 name = "nanomiddleclick-platform"

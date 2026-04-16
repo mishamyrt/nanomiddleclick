@@ -5,8 +5,9 @@ Minimal Rust + Objective-C daemon that emulates MiddleClick-style middle mouse c
 ## Workspace layout
 
 - `nanomiddleclick-core`: gesture/domain logic and config normalization.
+- `nanomiddleclick-launchd`: LaunchAgent plist rendering and `launchctl` integration.
 - `nanomiddleclick-platform`: macOS integration, Objective-C shim, and safe Rust wrappers.
-- `nanomiddleclick-daemon`: daemon wiring, runtime state, and logging.
+- `nanomiddleclick`: daemon wiring, runtime state, logging, and CLI entrypoint.
 
 ## What it implements
 
@@ -14,7 +15,7 @@ Minimal Rust + Objective-C daemon that emulates MiddleClick-style middle mouse c
 - Tap-to-click path with the same `fingers`, `allowMoreFingers`, `maxDistanceDelta`, `maxTimeDelta`, `tapToClick`, and `ignoredAppBundles` settings.
 - Listener restarts on multitouch device changes, wake, and display reconfiguration.
 - `defaults`-driven configuration with `SIGHUP` reload support.
-- `launchd` template for a per-user `LaunchAgent`.
+- `launchd` management through `nanomiddleclick daemon on|off`.
 
 ## Build
 
@@ -46,23 +47,34 @@ defaults write co.myrt.nanomiddleclick ignoredAppBundles -array com.apple.finder
 Reload the running daemon after changing defaults:
 
 ```sh
-kill -HUP "$(pgrep -x nanomiddleclickd)"
+kill -HUP "$(pgrep -x nanomiddleclick)"
 ```
 
-## LaunchAgent
+## CLI
 
-Use [launchd/co.myrt.nanomiddleclickd.plist](/Users/mishamyrt/Git/mishamyrt/nanomiddleclick/launchd/co.myrt.nanomiddleclickd.plist) as a template.
-
-Replace:
-
-- `__EXECUTABLE__` with the absolute path to `target/release/nanomiddleclickd`
-- `__STDOUT_PATH__` with a writable log path
-- `__STDERR_PATH__` with a writable log path
-
-Then load it:
+Run in the foreground:
 
 ```sh
-launchctl unload ~/Library/LaunchAgents/co.myrt.nanomiddleclickd.plist 2>/dev/null || true
-cp launchd/co.myrt.nanomiddleclickd.plist ~/Library/LaunchAgents/co.myrt.nanomiddleclickd.plist
-launchctl load ~/Library/LaunchAgents/co.myrt.nanomiddleclickd.plist
+target/release/nanomiddleclick
 ```
+
+Enable verbose logging:
+
+```sh
+target/release/nanomiddleclick -v
+```
+
+Manage the per-user LaunchAgent:
+
+```sh
+target/release/nanomiddleclick daemon on
+target/release/nanomiddleclick daemon off
+```
+
+`daemon on` writes `~/Library/LaunchAgents/co.myrt.nanomiddleclick.plist`, points it at the current `nanomiddleclick` binary, writes logs to `~/Library/Logs/nanomiddleclick.stdout.log` and `~/Library/Logs/nanomiddleclick.stderr.log`, and loads the agent with `launchctl`.
+
+`daemon off` unloads that LaunchAgent and removes the plist file.
+
+## LaunchAgent template
+
+[launchd/co.myrt.nanomiddleclick.plist](/Users/mishamyrt/Git/mishamyrt/nanomiddleclick/launchd/co.myrt.nanomiddleclick.plist) matches the generated LaunchAgent shape if you want a static reference copy.

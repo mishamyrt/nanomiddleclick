@@ -1,5 +1,16 @@
 use std::fmt;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
+
+static VERBOSE_LOGGING: AtomicBool = AtomicBool::new(false);
+
+pub fn set_verbose(enabled: bool) {
+    VERBOSE_LOGGING.store(enabled, Ordering::Relaxed);
+}
+
+pub fn verbose_enabled() -> bool {
+    VERBOSE_LOGGING.load(Ordering::Relaxed)
+}
 
 #[allow(clippy::print_stderr)]
 pub fn log(level: &str, message: fmt::Arguments<'_>) {
@@ -12,14 +23,18 @@ pub fn log(level: &str, message: fmt::Arguments<'_>) {
 #[macro_export]
 macro_rules! log_info {
     ($($arg:tt)*) => {
-        $crate::logging::log("INFO", format_args!($($arg)*))
+        if $crate::logging::verbose_enabled() {
+            $crate::logging::log("INFO", format_args!($($arg)*))
+        }
     };
 }
 
 #[macro_export]
 macro_rules! log_warn {
     ($($arg:tt)*) => {
-        $crate::logging::log("WARN", format_args!($($arg)*))
+        if $crate::logging::verbose_enabled() {
+            $crate::logging::log("WARN", format_args!($($arg)*))
+        }
     };
 }
 
