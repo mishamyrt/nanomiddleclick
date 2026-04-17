@@ -4,7 +4,9 @@ use std::ffi::CStr;
 use std::slice;
 use std::sync::{Arc, OnceLock};
 
-use nanomiddleclick_core::{Config, MouseAction, MouseEventKind, TouchSource};
+use nanomiddleclick_core::{
+    Config, MouseAction, MouseEventKind, TouchDeviceKind, TouchSource,
+};
 
 pub const DEFAULTS_DOMAIN: &str = "co.myrt.nanomiddleclick";
 
@@ -13,15 +15,20 @@ static HANDLER: OnceLock<Arc<dyn EventHandler>> = OnceLock::new();
 #[derive(Clone, Copy, Debug)]
 pub struct TouchFrame<'a> {
     raw: &'a [raw::RawTouch],
+    source_kind: TouchDeviceKind,
 }
 
 impl<'a> TouchFrame<'a> {
-    fn new(raw: &'a [raw::RawTouch]) -> Self {
-        Self { raw }
+    fn new(raw: &'a [raw::RawTouch], source_kind: TouchDeviceKind) -> Self {
+        Self { raw, source_kind }
     }
 
     pub fn iter(self) -> impl Iterator<Item = Touch<'a>> {
         self.raw.iter().map(Touch)
+    }
+
+    pub fn source_kind(self) -> TouchDeviceKind {
+        self.source_kind
     }
 }
 
@@ -129,15 +136,21 @@ extern "C" fn touch_frame_callback(
     touch_count: usize,
     _timestamp: f64,
     _frame: i32,
+    source_kind: u32,
 ) {
     let Some(handler) = handler() else {
         return;
     };
 
+    let source_kind =
+        TouchDeviceKind::from_raw(source_kind).unwrap_or(TouchDeviceKind::Unknown);
     let touches = if touches.is_null() || touch_count == 0 {
-        TouchFrame::new(&[])
+        TouchFrame::new(&[], source_kind)
     } else {
-        TouchFrame::new(unsafe { slice::from_raw_parts(touches, touch_count) })
+        TouchFrame::new(
+            unsafe { slice::from_raw_parts(touches, touch_count) },
+            source_kind,
+        )
     };
 
     handler.handle_touch_frame(touches);

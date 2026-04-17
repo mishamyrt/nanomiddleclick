@@ -1,6 +1,6 @@
 use std::time::{Duration, Instant};
 
-use crate::Config;
+use crate::{Config, MouseClickMode};
 
 pub trait TouchSource {
     fn is_touching(&self) -> bool;
@@ -31,6 +31,26 @@ impl TouchSource for TouchContact {
 
     fn normalized_position(&self) -> (f32, f32) {
         (self.x, self.y)
+    }
+}
+
+#[repr(u32)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum TouchDeviceKind {
+    #[default]
+    Unknown = 0,
+    Mouse = 1,
+    Trackpad = 2,
+}
+
+impl TouchDeviceKind {
+    pub fn from_raw(raw: u32) -> Option<Self> {
+        match raw {
+            0 => Some(Self::Unknown),
+            1 => Some(Self::Mouse),
+            2 => Some(Self::Trackpad),
+            _ => None,
+        }
     }
 }
 
@@ -91,11 +111,13 @@ impl Point {
 struct TouchAnalysis {
     active_count: usize,
     centroid: Option<Point>,
+    single_active_position: Option<Point>,
 }
 
 pub struct GestureEngine {
     config: Config,
     required_touch_down: bool,
+    magic_mouse_center_touch_down: bool,
     click_rewrite_deadline: Option<Instant>,
     rewritten_mouse_down_active: bool,
     natural_middle_click_last_time: Option<Instant>,
@@ -109,6 +131,7 @@ impl GestureEngine {
         Self {
             config,
             required_touch_down: false,
+            magic_mouse_center_touch_down: false,
             click_rewrite_deadline: None,
             rewritten_mouse_down_active: false,
             natural_middle_click_last_time: None,
@@ -129,6 +152,7 @@ impl GestureEngine {
 
     pub fn cancel_current_touch_sequence(&mut self) {
         self.required_touch_down = false;
+        self.magic_mouse_center_touch_down = false;
         self.click_rewrite_deadline = None;
         self.touch_start_time = None;
         self.start_centroid = None;
@@ -140,7 +164,11 @@ impl GestureEngine {
         self.rewritten_mouse_down_active = false;
     }
 
-    pub fn handle_touch_frame<I, T>(&mut self, touches: I) -> GestureOutcome
+    pub fn handle_touch_frame<I, T>(
+        &mut self,
+        source_kind: TouchDeviceKind,
+        touches: I,
+    ) -> GestureOutcome
     where
         I: IntoIterator<Item = T>,
         T: TouchSource,
@@ -150,13 +178,22 @@ impl GestureEngine {
         let touch_count = analysis.active_count;
         let matches_required_fingers =
             self.count_matches_required_fingers(touch_count);
-        self.required_touch_down = matches_required_fingers;
+        self.required_touch_down = matches_required_fingers
+            && self.finger_click_allowed_for_source(source_kind);
+        self.magic_mouse_center_touch_down = self
+            .center_click_allowed_for_source(source_kind)
+            && Self::is_magic_mouse_center_touch(source_kind, analysis);
 
-        if matches_required_fingers {
+        if self.required_touch_down {
             self.click_rewrite_deadline = Some(now + click_rewrite_grace());
         }
 
         if touch_count == 0 {
+            if !self.tap_gesture_allowed_for_source(source_kind) {
+                self.clear_tap_tracking();
+                return GestureOutcome::None;
+            }
+
             let outcome = self.finish_touch_sequence();
             if outcome == GestureOutcome::EmulateMiddleClick {
                 self.click_rewrite_deadline = None;
@@ -164,10 +201,8 @@ impl GestureEngine {
             return outcome;
         }
 
-        if !self.config.tap_to_click {
-            self.touch_start_time = None;
-            self.start_centroid = None;
-            self.latest_centroid = None;
+        if !self.tap_gesture_allowed_for_source(source_kind) {
+            self.clear_tap_tracking();
             return GestureOutcome::None;
         }
 
@@ -201,14 +236,16 @@ impl GestureEngine {
     }
 
     pub fn handle_mouse_event(&mut self, kind: MouseEventKind) -> MouseAction {
-        let click_eligible =
-            self.required_touch_down || self.has_recent_click_touch();
+        let click_eligible = self.required_touch_down
+            || self.magic_mouse_center_touch_down
+            || self.has_recent_click_touch();
         match kind {
             MouseEventKind::LeftDown | MouseEventKind::RightDown
                 if click_eligible =>
             {
                 self.rewritten_mouse_down_active = true;
                 self.required_touch_down = false;
+                self.magic_mouse_center_touch_down = false;
                 self.click_rewrite_deadline = None;
                 self.natural_middle_click_last_time = Some(Instant::now());
                 MouseAction::RewriteDown
@@ -234,6 +271,7 @@ impl GestureEngine {
         let start_centroid = self.start_centroid.take();
         let latest_centroid = self.latest_centroid.take();
         self.required_touch_down = false;
+        self.magic_mouse_center_touch_down = false;
 
         let Some(start_centroid) = start_centroid else {
             return GestureOutcome::None;
@@ -264,6 +302,35 @@ impl GestureEngine {
         }
     }
 
+    fn finger_click_allowed_for_source(&self, source_kind: TouchDeviceKind) -> bool {
+        source_kind != TouchDeviceKind::Mouse
+            || self.config.mouse_click_mode == MouseClickMode::ThreeFinger
+    }
+
+    fn center_click_allowed_for_source(&self, source_kind: TouchDeviceKind) -> bool {
+        source_kind == TouchDeviceKind::Mouse
+            && self.config.mouse_click_mode == MouseClickMode::Center
+    }
+
+    fn tap_gesture_allowed_for_source(&self, source_kind: TouchDeviceKind) -> bool {
+        self.config.tap_to_click && self.finger_click_allowed_for_source(source_kind)
+    }
+
+    fn is_magic_mouse_center_touch(
+        source_kind: TouchDeviceKind,
+        analysis: TouchAnalysis,
+    ) -> bool {
+        const MAGIC_MOUSE_CENTER_MIN_X: f64 = 0.35;
+        const MAGIC_MOUSE_CENTER_MAX_X: f64 = 0.65;
+
+        source_kind == TouchDeviceKind::Mouse
+            && analysis.active_count == 1
+            && analysis.single_active_position.is_some_and(|position| {
+                (MAGIC_MOUSE_CENTER_MIN_X..=MAGIC_MOUSE_CENTER_MAX_X)
+                    .contains(&position.x)
+            })
+    }
+
     fn analyze_touches<I, T>(&self, touches: I) -> TouchAnalysis
     where
         I: IntoIterator<Item = T>,
@@ -272,17 +339,25 @@ impl GestureEngine {
         let mut active_count = 0usize;
         let mut sample_count = 0usize;
         let mut sum = Point::default();
+        let mut single_active_position = None;
         for touch in touches {
             if !touch.is_touching() {
                 continue;
             }
 
             active_count += 1;
+            let (x, y) = touch.normalized_position();
+            if active_count == 1 {
+                single_active_position =
+                    Some(Point { x: f64::from(x), y: f64::from(y) });
+            } else {
+                single_active_position = None;
+            }
+
             if sample_count >= self.config.fingers {
                 continue;
             }
 
-            let (x, y) = touch.normalized_position();
             sum.x += f64::from(x);
             sum.y += f64::from(y);
             sample_count += 1;
@@ -299,7 +374,13 @@ impl GestureEngine {
             })
         };
 
-        TouchAnalysis { active_count, centroid }
+        TouchAnalysis { active_count, centroid, single_active_position }
+    }
+
+    fn clear_tap_tracking(&mut self) {
+        self.touch_start_time = None;
+        self.start_centroid = None;
+        self.latest_centroid = None;
     }
 
     fn should_suppress_synthetic_click(&self) -> bool {
@@ -338,6 +419,7 @@ fn click_rewrite_grace() -> Duration {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::MouseClickMode;
 
     fn config() -> Config {
         Config {
@@ -346,8 +428,15 @@ mod tests {
             max_distance_delta: 0.05,
             max_time_delta: Duration::from_millis(300),
             tap_to_click: true,
+            mouse_click_mode: MouseClickMode::ThreeFinger,
             ignored_app_bundles: Vec::new().into_boxed_slice(),
         }
+    }
+
+    fn config_with_mouse_click_mode(mouse_click_mode: MouseClickMode) -> Config {
+        let mut config = config();
+        config.mouse_click_mode = mouse_click_mode;
+        config
     }
 
     fn touch(x: f32, y: f32) -> TouchContact {
@@ -361,11 +450,10 @@ mod tests {
     #[test]
     fn rewrites_mouse_down_and_up_when_required_fingers_are_down() {
         let mut engine = GestureEngine::new(config());
-        engine.handle_touch_frame([
-            touch(0.1, 0.1),
-            touch(0.2, 0.2),
-            touch(0.3, 0.3),
-        ]);
+        engine.handle_touch_frame(
+            TouchDeviceKind::Trackpad,
+            [touch(0.1, 0.1), touch(0.2, 0.2), touch(0.3, 0.3)],
+        );
 
         assert_eq!(
             engine.handle_mouse_event(MouseEventKind::LeftDown),
@@ -380,12 +468,14 @@ mod tests {
     #[test]
     fn rewrites_mouse_down_after_brief_touch_drop_before_click() {
         let mut engine = GestureEngine::new(config());
-        engine.handle_touch_frame([
-            touch(0.1, 0.1),
-            touch(0.2, 0.2),
-            touch(0.3, 0.3),
-        ]);
-        engine.handle_touch_frame([touch(0.1, 0.1), touch(0.2, 0.2)]);
+        engine.handle_touch_frame(
+            TouchDeviceKind::Trackpad,
+            [touch(0.1, 0.1), touch(0.2, 0.2), touch(0.3, 0.3)],
+        );
+        engine.handle_touch_frame(
+            TouchDeviceKind::Trackpad,
+            [touch(0.1, 0.1), touch(0.2, 0.2)],
+        );
 
         assert_eq!(
             engine.handle_mouse_event(MouseEventKind::LeftDown),
@@ -396,12 +486,14 @@ mod tests {
     #[test]
     fn does_not_rewrite_mouse_down_after_touch_grace_expires() {
         let mut engine = GestureEngine::new(config());
-        engine.handle_touch_frame([
-            touch(0.1, 0.1),
-            touch(0.2, 0.2),
-            touch(0.3, 0.3),
-        ]);
-        engine.handle_touch_frame([touch(0.1, 0.1), touch(0.2, 0.2)]);
+        engine.handle_touch_frame(
+            TouchDeviceKind::Trackpad,
+            [touch(0.1, 0.1), touch(0.2, 0.2), touch(0.3, 0.3)],
+        );
+        engine.handle_touch_frame(
+            TouchDeviceKind::Trackpad,
+            [touch(0.1, 0.1), touch(0.2, 0.2)],
+        );
         std::thread::sleep(Duration::from_millis(100));
 
         assert_eq!(
@@ -413,19 +505,20 @@ mod tests {
     #[test]
     fn emits_middle_click_for_valid_tap() {
         let mut engine = GestureEngine::new(config());
-        engine.handle_touch_frame([
-            touch(0.1, 0.1),
-            touch(0.2, 0.2),
-            touch(0.3, 0.3),
-        ]);
-        engine.handle_touch_frame([
-            touch(0.11, 0.1),
-            touch(0.21, 0.2),
-            touch(0.31, 0.3),
-        ]);
+        engine.handle_touch_frame(
+            TouchDeviceKind::Trackpad,
+            [touch(0.1, 0.1), touch(0.2, 0.2), touch(0.3, 0.3)],
+        );
+        engine.handle_touch_frame(
+            TouchDeviceKind::Trackpad,
+            [touch(0.11, 0.1), touch(0.21, 0.2), touch(0.31, 0.3)],
+        );
 
         assert_eq!(
-            engine.handle_touch_frame(std::iter::empty::<TouchContact>()),
+            engine.handle_touch_frame(
+                TouchDeviceKind::Trackpad,
+                std::iter::empty::<TouchContact>(),
+            ),
             GestureOutcome::EmulateMiddleClick
         );
     }
@@ -433,10 +526,16 @@ mod tests {
     #[test]
     fn ignores_tap_when_touch_count_never_reaches_required_fingers() {
         let mut engine = GestureEngine::new(config());
-        engine.handle_touch_frame([touch(0.1, 0.1), touch(0.2, 0.2)]);
+        engine.handle_touch_frame(
+            TouchDeviceKind::Trackpad,
+            [touch(0.1, 0.1), touch(0.2, 0.2)],
+        );
 
         assert_eq!(
-            engine.handle_touch_frame(std::iter::empty::<TouchContact>()),
+            engine.handle_touch_frame(
+                TouchDeviceKind::Trackpad,
+                std::iter::empty::<TouchContact>(),
+            ),
             GestureOutcome::None
         );
     }
@@ -444,16 +543,109 @@ mod tests {
     #[test]
     fn ignores_hover_touches_for_centroid_and_counting() {
         let mut engine = GestureEngine::new(config());
-        engine.handle_touch_frame([
-            touch(0.1, 0.1),
-            touch(0.2, 0.2),
-            touch(0.3, 0.3),
-            hover_touch(0.9, 0.9),
-        ]);
+        engine.handle_touch_frame(
+            TouchDeviceKind::Trackpad,
+            [
+                touch(0.1, 0.1),
+                touch(0.2, 0.2),
+                touch(0.3, 0.3),
+                hover_touch(0.9, 0.9),
+            ],
+        );
 
         assert_eq!(
-            engine.handle_touch_frame(std::iter::empty::<TouchContact>()),
+            engine.handle_touch_frame(
+                TouchDeviceKind::Trackpad,
+                std::iter::empty::<TouchContact>(),
+            ),
             GestureOutcome::EmulateMiddleClick
+        );
+    }
+
+    #[test]
+    fn rewrites_click_for_magic_mouse_three_finger_touch_in_three_finger_mode() {
+        let mut engine = GestureEngine::new(config_with_mouse_click_mode(
+            MouseClickMode::ThreeFinger,
+        ));
+        engine.handle_touch_frame(
+            TouchDeviceKind::Mouse,
+            [touch(0.1, 0.1), touch(0.2, 0.2), touch(0.3, 0.3)],
+        );
+
+        assert_eq!(
+            engine.handle_mouse_event(MouseEventKind::LeftDown),
+            MouseAction::RewriteDown
+        );
+        assert_eq!(
+            engine.handle_mouse_event(MouseEventKind::LeftUp),
+            MouseAction::RewriteUp
+        );
+    }
+
+    #[test]
+    fn rewrites_click_for_magic_mouse_center_touch_in_center_mode() {
+        let mut engine =
+            GestureEngine::new(config_with_mouse_click_mode(MouseClickMode::Center));
+        engine.handle_touch_frame(TouchDeviceKind::Mouse, [touch(0.5, 0.4)]);
+
+        assert_eq!(
+            engine.handle_mouse_event(MouseEventKind::LeftDown),
+            MouseAction::RewriteDown
+        );
+    }
+
+    #[test]
+    fn does_not_rewrite_click_for_magic_mouse_off_center_touch_in_center_mode() {
+        let mut engine =
+            GestureEngine::new(config_with_mouse_click_mode(MouseClickMode::Center));
+        engine.handle_touch_frame(TouchDeviceKind::Mouse, [touch(0.2, 0.4)]);
+
+        assert_eq!(
+            engine.handle_mouse_event(MouseEventKind::LeftDown),
+            MouseAction::Pass
+        );
+    }
+
+    #[test]
+    fn does_not_rewrite_click_for_magic_mouse_center_touch_in_disabled_mode() {
+        let mut engine = GestureEngine::new(config_with_mouse_click_mode(
+            MouseClickMode::Disabled,
+        ));
+        engine.handle_touch_frame(TouchDeviceKind::Mouse, [touch(0.5, 0.4)]);
+
+        assert_eq!(
+            engine.handle_mouse_event(MouseEventKind::LeftDown),
+            MouseAction::Pass
+        );
+    }
+
+    #[test]
+    fn does_not_emit_tap_for_magic_mouse_in_center_mode() {
+        let mut engine =
+            GestureEngine::new(config_with_mouse_click_mode(MouseClickMode::Center));
+        engine.handle_touch_frame(
+            TouchDeviceKind::Mouse,
+            [touch(0.1, 0.1), touch(0.2, 0.2), touch(0.3, 0.3)],
+        );
+
+        assert_eq!(
+            engine.handle_touch_frame(
+                TouchDeviceKind::Mouse,
+                std::iter::empty::<TouchContact>(),
+            ),
+            GestureOutcome::None
+        );
+    }
+
+    #[test]
+    fn does_not_rewrite_click_for_trackpad_center_touch() {
+        let mut engine =
+            GestureEngine::new(config_with_mouse_click_mode(MouseClickMode::Center));
+        engine.handle_touch_frame(TouchDeviceKind::Trackpad, [touch(0.5, 0.4)]);
+
+        assert_eq!(
+            engine.handle_mouse_event(MouseEventKind::LeftDown),
+            MouseAction::Pass
         );
     }
 }

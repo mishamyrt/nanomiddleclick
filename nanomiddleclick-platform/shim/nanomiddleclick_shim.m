@@ -12,7 +12,7 @@
 
 #import "MultitouchSupport.h"
 
-typedef void (*NMCTouchCallback)(const MTTouch *touches, uintptr_t touchCount, double timestamp, int32_t frame);
+typedef void (*NMCTouchCallback)(const MTTouch *touches, uintptr_t touchCount, double timestamp, int32_t frame, uint32_t source_kind);
 typedef uint32_t (*NMCMouseEventCallback)(uint32_t kind);
 typedef void (*NMCSystemEventCallback)(uint32_t kind);
 typedef void (*NMCSignalEventCallback)(uint32_t kind);
@@ -24,6 +24,7 @@ typedef struct {
     double max_distance_delta;
     int64_t max_time_delta_ms;
     bool tap_to_click;
+    uint32_t mouse_click_mode;
     char **ignored_app_bundles;
     uintptr_t ignored_app_bundles_len;
 } NMCConfigSnapshot;
@@ -51,6 +52,12 @@ typedef NS_ENUM(uint32_t, NMCSignalKind) {
     NMCSignalKindReload = 1,
 };
 
+typedef NS_ENUM(uint32_t, NMCTouchDeviceKind) {
+    NMCTouchDeviceKindUnknown = 0,
+    NMCTouchDeviceKindMouse = 1,
+    NMCTouchDeviceKindTrackpad = 2,
+};
+
 static NSString *const NMCDefaultsDomain = @"co.myrt.nanomiddleclick";
 
 static NMCTouchCallback g_touch_callback = NULL;
@@ -60,6 +67,7 @@ static NMCSignalEventCallback g_signal_event_callback = NULL;
 static NMCFrontmostBundleCallback g_frontmost_bundle_callback = NULL;
 
 static NSArray *g_devices = nil;
+static NSMutableDictionary<NSValue *, NSNumber *> *g_touch_device_kinds = nil;
 static CFMachPortRef g_event_tap = NULL;
 static CFRunLoopSourceRef g_event_tap_source = NULL;
 static CFRunLoopRef g_run_loop = NULL;
@@ -91,6 +99,9 @@ static void NMCStartSignalMonitor(void);
 static void NMCStopSignalMonitor(void);
 static void NMCNotifyFrontmostBundle(void);
 static NSDictionary *NMCReadDefaultsDomain(void);
+static uint32_t NMCParseMouseClickMode(id raw_value);
+static bool NMCDeviceHasMousePreferences(MTDeviceRef device);
+static NMCTouchDeviceKind NMCClassifyTouchDevice(MTDeviceRef device);
 
 static CGEventRef NMCMouseTapCallback(CGEventTapProxy proxy, CGEventType type, CGEventRef event, void *userInfo) {
     (void)proxy;
@@ -138,13 +149,57 @@ static CGEventRef NMCMouseTapCallback(CGEventTapProxy proxy, CGEventType type, C
 }
 
 static void NMCTouchFrameCallback(MTDeviceRef device, MTTouch touches[], int numTouches, double timestamp, int frame) {
-    (void)device;
     if (g_touch_callback == NULL) {
         return;
     }
 
     const MTTouch *pointer = numTouches > 0 ? touches : NULL;
-    g_touch_callback(pointer, (uintptr_t)(numTouches > 0 ? numTouches : 0), timestamp, frame);
+    const uint32_t source_kind = NMCClassifyTouchDevice(device);
+    g_touch_callback(pointer, (uintptr_t)(numTouches > 0 ? numTouches : 0), timestamp, frame, source_kind);
+}
+
+static bool NMCDeviceHasMousePreferences(MTDeviceRef device) {
+    const io_service_t service = MTDeviceGetService(device);
+    if (service == IO_OBJECT_NULL) {
+        return false;
+    }
+
+    CFTypeRef preferences = IORegistryEntryCreateCFProperty(
+        service,
+        CFSTR("MultitouchPreferences"),
+        kCFAllocatorDefault,
+        0
+    );
+    if (preferences == NULL) {
+        return false;
+    }
+
+    bool has_mouse_preferences = false;
+    if (CFGetTypeID(preferences) == CFDictionaryGetTypeID()) {
+        has_mouse_preferences = CFDictionaryContainsKey(
+            (CFDictionaryRef)preferences,
+            CFSTR("MouseButtonMode")
+        );
+    }
+
+    CFRelease(preferences);
+    return has_mouse_preferences;
+}
+
+static NMCTouchDeviceKind NMCClassifyTouchDevice(MTDeviceRef device) {
+    NSNumber *cached_kind = [g_touch_device_kinds objectForKey:[NSValue valueWithPointer:device]];
+    if (cached_kind != nil) {
+        return (NMCTouchDeviceKind)cached_kind.unsignedIntValue;
+    }
+
+    const io_service_t service = MTDeviceGetService(device);
+    if (service == IO_OBJECT_NULL) {
+        return NMCTouchDeviceKindUnknown;
+    }
+
+    return NMCDeviceHasMousePreferences(device)
+        ? NMCTouchDeviceKindMouse
+        : NMCTouchDeviceKindTrackpad;
 }
 
 static void NMCMultitouchDeviceAdded(void *refcon, io_iterator_t iterator) {
@@ -199,6 +254,7 @@ bool nmc_load_config(NMCConfigSnapshot *out_snapshot) {
     NSNumber *max_distance_delta = [domain objectForKey:@"maxDistanceDelta"];
     NSNumber *max_time_delta = [domain objectForKey:@"maxTimeDelta"];
     id tap_to_click = [domain objectForKey:@"tapToClick"];
+    id mouse_click_mode = [domain objectForKey:@"mouseClickMode"];
     id ignored = [domain objectForKey:@"ignoredAppBundles"];
 
     out_snapshot->fingers = fingers != nil ? fingers.longLongValue : 3;
@@ -206,6 +262,7 @@ bool nmc_load_config(NMCConfigSnapshot *out_snapshot) {
     out_snapshot->max_distance_delta = max_distance_delta != nil ? max_distance_delta.doubleValue : 0.05;
     out_snapshot->max_time_delta_ms = max_time_delta != nil ? max_time_delta.longLongValue : 300;
     out_snapshot->tap_to_click = tap_to_click != nil ? [tap_to_click boolValue] : NMCGetSystemTapToClick();
+    out_snapshot->mouse_click_mode = NMCParseMouseClickMode(mouse_click_mode);
 
     NSArray<NSString *> *bundle_ids = nil;
     if ([ignored isKindOfClass:[NSArray class]]) {
@@ -342,6 +399,29 @@ static NSDictionary *NMCReadDefaultsDomain(void) {
     return @{};
 }
 
+static uint32_t NMCParseMouseClickMode(id raw_value) {
+    if ([raw_value isKindOfClass:[NSNumber class]]) {
+        return ((NSNumber *)raw_value).unsignedIntValue;
+    }
+
+    if (![raw_value isKindOfClass:[NSString class]]) {
+        return 0;
+    }
+
+    NSString *value = [(NSString *)raw_value lowercaseString];
+    if ([value isEqualToString:@"center"]) {
+        return 1;
+    }
+    if ([value isEqualToString:@"disabled"]) {
+        return 2;
+    }
+    if ([value isEqualToString:@"threefinger"]) {
+        return 0;
+    }
+
+    return 0;
+}
+
 static void NMCDrainIterator(io_iterator_t iterator) {
     io_object_t object = IO_OBJECT_NULL;
     while ((object = IOIteratorNext(iterator)) != IO_OBJECT_NULL) {
@@ -358,18 +438,23 @@ static void NMCStopTouchDevices(void) {
     }
 
     g_devices = nil;
+    g_touch_device_kinds = nil;
 }
 
 static void NMCStartTouchDevices(void) {
     CFArrayRef list = MTDeviceCreateList();
     if (list == NULL) {
         g_devices = @[];
+        g_touch_device_kinds = [NSMutableDictionary new];
         return;
     }
 
     g_devices = CFBridgingRelease(list);
+    g_touch_device_kinds = [NSMutableDictionary new];
     for (id device in g_devices) {
         MTDeviceRef ref = (__bridge MTDeviceRef)device;
+        const NMCTouchDeviceKind kind = NMCClassifyTouchDevice(ref);
+        [g_touch_device_kinds setObject:@(kind) forKey:[NSValue valueWithPointer:ref]];
         MTRegisterContactFrameCallback(ref, NMCTouchFrameCallback);
         MTDeviceStart(ref, 0);
     }

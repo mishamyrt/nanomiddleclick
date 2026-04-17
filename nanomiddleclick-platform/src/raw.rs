@@ -45,6 +45,7 @@ struct RawConfigSnapshot {
     max_distance_delta: f64,
     max_time_delta_ms: i64,
     tap_to_click: bool,
+    mouse_click_mode: u32,
     ignored_app_bundles: *mut *mut c_char,
     ignored_app_bundles_len: usize,
 }
@@ -54,6 +55,7 @@ pub type TouchFrameCallback = extern "C" fn(
     touch_count: usize,
     timestamp: f64,
     frame: i32,
+    source_kind: u32,
 );
 pub type MouseEventCallback = extern "C" fn(kind: u32) -> u32;
 pub type SystemEventCallback = extern "C" fn(kind: u32);
@@ -94,6 +96,7 @@ pub(crate) fn load_config() -> Result<Config, String> {
         max_distance_delta: 0.0,
         max_time_delta_ms: 0,
         tap_to_click: false,
+        mouse_click_mode: 0,
         ignored_app_bundles: ptr::null_mut(),
         ignored_app_bundles_len: 0,
     };
@@ -139,6 +142,7 @@ unsafe fn config_from_raw(raw: &RawConfigSnapshot) -> Config {
         raw.max_distance_delta,
         raw.max_time_delta_ms,
         raw.tap_to_click,
+        raw.mouse_click_mode,
         ignored_app_bundles.into_boxed_slice(),
     )
 }

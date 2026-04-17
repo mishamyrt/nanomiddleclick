@@ -5,6 +5,33 @@ const DEFAULT_FINGERS: usize = 3;
 const DEFAULT_ALLOW_MORE_FINGERS: bool = false;
 const DEFAULT_MAX_DISTANCE_DELTA: f64 = 0.05;
 const DEFAULT_MAX_TIME_DELTA_MS: u64 = 300;
+const DEFAULT_MOUSE_CLICK_MODE: MouseClickMode = MouseClickMode::Center;
+
+#[repr(u32)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum MouseClickMode {
+    ThreeFinger = 0,
+    Center = 1,
+    Disabled = 2,
+}
+
+impl MouseClickMode {
+    pub fn from_raw(raw: u32) -> Self {
+        match raw {
+            1 => Self::Center,
+            2 => Self::Disabled,
+            _ => Self::ThreeFinger,
+        }
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::ThreeFinger => "threeFinger",
+            Self::Center => "center",
+            Self::Disabled => "disabled",
+        }
+    }
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Config {
@@ -13,6 +40,7 @@ pub struct Config {
     pub max_distance_delta: f64,
     pub max_time_delta: Duration,
     pub tap_to_click: bool,
+    pub mouse_click_mode: MouseClickMode,
     pub ignored_app_bundles: Box<[Box<str>]>,
 }
 
@@ -23,6 +51,7 @@ impl Config {
         max_distance_delta: f64,
         max_time_delta_ms: i64,
         tap_to_click: bool,
+        mouse_click_mode: u32,
         ignored_app_bundles: Box<[Box<str>]>,
     ) -> Self {
         let fingers = match usize::try_from(fingers) {
@@ -48,6 +77,7 @@ impl Config {
             max_distance_delta,
             max_time_delta: Duration::from_millis(max_time_delta_ms),
             tap_to_click,
+            mouse_click_mode: MouseClickMode::from_raw(mouse_click_mode),
             ignored_app_bundles,
         }
     }
@@ -59,18 +89,20 @@ impl Config {
             max_distance_delta: DEFAULT_MAX_DISTANCE_DELTA,
             max_time_delta: Duration::from_millis(DEFAULT_MAX_TIME_DELTA_MS),
             tap_to_click: system_tap_to_click,
+            mouse_click_mode: DEFAULT_MOUSE_CLICK_MODE,
             ignored_app_bundles: Vec::new().into_boxed_slice(),
         }
     }
 
     pub fn describe(&self) -> String {
         format!(
-            "fingers={}, allowMoreFingers={}, maxDistanceDelta={:.4}, maxTimeDeltaMs={}, tapToClick={}, ignoredAppBundles={}",
+            "fingers={}, allowMoreFingers={}, maxDistanceDelta={:.4}, maxTimeDeltaMs={}, tapToClick={}, mouseClickMode={}, ignoredAppBundles={}",
             self.fingers,
             self.allow_more_fingers,
             self.max_distance_delta,
             self.max_time_delta.as_millis(),
             self.tap_to_click,
+            self.mouse_click_mode.as_str(),
             self.ignored_app_bundles.len(),
         )
     }

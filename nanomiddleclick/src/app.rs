@@ -78,7 +78,7 @@ impl EventHandler for App {
 
         let outcome = {
             let mut engine = lock_or_recover(&self.engine);
-            engine.handle_touch_frame(touches.iter())
+            engine.handle_touch_frame(touches.source_kind(), touches.iter())
         };
 
         if let GestureOutcome::EmulateMiddleClick = outcome {

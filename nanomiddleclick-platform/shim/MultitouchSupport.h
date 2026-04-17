@@ -2,6 +2,7 @@
 #define __MULTITOUCH_SUPPORT_H__
 
 #include <CoreFoundation/CoreFoundation.h>
+#include <IOKit/IOKitLib.h>
 
 typedef struct {
     int frame;
@@ -41,6 +42,7 @@ typedef void *MTDeviceRef;
 extern CFMutableArrayRef MTDeviceCreateList(void);
 extern int MTDeviceStart(MTDeviceRef device, int unknown);
 extern int MTDeviceStop(MTDeviceRef device);
+extern io_service_t MTDeviceGetService(MTDeviceRef device);
 extern int MTRegisterContactFrameCallback(
     MTDeviceRef device,
     void (*callback)(MTDeviceRef, MTTouch *, int, double, int)
