@@ -1,80 +1,138 @@
-# nanomiddleclick
+<p align="center">
+    <img src="./docs/logo.svg" width="50px" />
+</p>
 
-Minimal Rust + Objective-C daemon that emulates MiddleClick-style middle mouse clicks from macOS multitouch gestures.
+<h1 align="center">nanomiddleclick</h1>
 
-## Workspace layout
+<p align="center">
+  <a href="https://github.com/mishamyrt/nanomiddleclick/actions/workflows/qa.yml">
+      <img src="https://github.com/mishamyrt/nanomiddleclick/actions/workflows/qa.yml/badge.svg" />
+  </a>
+</p>
 
-- `nanomiddleclick-core`: gesture/domain logic and config normalization.
-- `nanomiddleclick-launchd`: LaunchAgent plist rendering and `launchctl` integration.
-- `nanomiddleclick-platform`: macOS integration, Objective-C shim, and safe Rust wrappers.
-- `nanomiddleclick`: daemon wiring, runtime state, logging, and CLI entrypoint.
+Lightweight daemon for middle-click emulation on macOS.
 
-## What it implements
+## Features
 
-- Physical click rewrite: when the configured finger count is down, left/right click is rewritten to center click.
-- Tap-to-click path with the same `fingers`, `allowMoreFingers`, `maxDistanceDelta`, `maxTimeDelta`, `tapToClick`, and `ignoredAppBundles` settings.
-- Listener restarts on multitouch device changes, wake, and display reconfiguration.
-- `defaults`-driven configuration with `SIGHUP` reload support.
-- `launchd` management through `nanomiddleclick daemon on|off`.
+- Supports:
+  - MacBook onboard trackpad;
+  - Magic Trackpad;
+  - Magic Mouse.
+- Uses 12 MB of RAM (compared to 40+ for [MiddleClick](https://github.com/artginzburg/MiddleClick))
+- Highly configurable.
 
-## Build
+## What for?
 
-```sh
-cargo build --release
-```
+To open links in a new tab or close tabs in browsers with a single action using one hand (without pressing cmd) and paste highlighted text in the Terminal app.
 
-The macOS platform crate compiles its local Objective-C shim from `nanomiddleclick-platform/shim/` and links against macOS frameworks plus the private `MultitouchSupport.framework`.
+## Installation
 
-## Defaults domain
+### From source
 
-The daemon reads settings from:
-
-```sh
-co.myrt.nanomiddleclick
-```
-
-Supported keys:
+To build the project, you must have the Rust toolchain installed on your computer.
 
 ```sh
-defaults write co.myrt.nanomiddleclick fingers -int 4
-defaults write co.myrt.nanomiddleclick allowMoreFingers -bool true
-defaults write co.myrt.nanomiddleclick maxDistanceDelta -float 0.03
-defaults write co.myrt.nanomiddleclick maxTimeDelta -int 150
-defaults write co.myrt.nanomiddleclick tapToClick -bool true
-defaults write co.myrt.nanomiddleclick ignoredAppBundles -array com.apple.finder com.apple.Terminal
+make
+make install
 ```
 
-Reload the running daemon after changing defaults:
+## Setup
+
+Once the app is installed, you need to start the background process. To do this, run the following in your terminal:
+
+```
+nanomiddleclick daemon on
+```
+
+## Configuration
+
+The daemon reads settings from `co.myrt.nanomiddleclick`. After changing the configuration, you must restart the daemon:
 
 ```sh
 kill -HUP "$(pgrep -x nanomiddleclick)"
 ```
 
-## CLI
+### Number of Fingers
 
-Run in the foreground:
+You can use any number of fingers (up to 10) to middle-click.
 
-```sh
-target/release/nanomiddleclick
-```
-
-Enable verbose logging:
+> ☝️ Note: setting fingers to 2 will conflict with normal two-finger right-clicks.
 
 ```sh
-target/release/nanomiddleclick -v
+defaults write co.myrt.nanomiddleclick fingers -int 4
 ```
 
-Manage the per-user LaunchAgent:
+### Allow to click with more than the defined number of fingers.
+
+This is useful if your second hand accidentally touches the touchpad.
+
+Disabled by default.
 
 ```sh
-target/release/nanomiddleclick daemon on
-target/release/nanomiddleclick daemon off
+defaults write co.myrt.nanomiddleclick allowMoreFingers -bool true
 ```
 
-`daemon on` writes `~/Library/LaunchAgents/co.myrt.nanomiddleclick.plist`, points it at the current `nanomiddleclick` binary, writes logs to `~/Library/Logs/nanomiddleclick.stdout.log` and `~/Library/Logs/nanomiddleclick.stderr.log`, and loads the agent with `launchctl`.
+### Tapping tuning
 
-`daemon off` unloads that LaunchAgent and removes the plist file.
+The default values for these settings should work for most users, but if they aren't working correctly for you, you should start by adjusting them.
 
-## LaunchAgent template
+#### Max Distance Delta
 
-[launchd/co.myrt.nanomiddleclick.plist](/Users/mishamyrt/Git/mishamyrt/nanomiddleclick/launchd/co.myrt.nanomiddleclick.plist) matches the generated LaunchAgent shape if you want a static reference copy.
+The maximum distance the cursor can travel between touch and release for a tap to be considered valid. The position is normalized and values go from 0 to 1.
+
+Default is 0.05.
+
+```sh
+defaults write co.myrt.nanomiddleclick maxDistanceDelta -float 0.03
+```
+
+#### Max Time Delta
+
+The maximum interval in milliseconds between touch and release for a tap to be considered valid.
+
+Default is 300
+
+```sh
+defaults write co.myrt.nanomiddleclick maxTimeDelta -int 150
+```
+
+### Ignored apps
+
+Some (actually very rare) applications have built-in separate support for 3-finger taps. To avoid conflicts with them and prevent the daemon from running, use can use `ignoredAppBundles` parameter.
+
+Default is empty.
+
+```sh
+defaults write co.myrt.nanomiddleclick ignoredAppBundles -array com.apple.finder com.apple.Terminal
+```
+
+### Tap to click
+
+The app can handle both clicks and trackpad taps.
+By default, it follows the system behavior for 1 and 2 fingers, but you can set a custom one:
+
+```sh
+defaults write co.myrt.nanomiddleclick tapToClick -bool true
+```
+
+### Magic Mouse mode
+
+Magic Mouse supports several types of actions to emulate a middle-click:
+
+- `center` — click with one finger in the horizontal center zone. 
+- `threeFinger` — click with 3 fingers anywhere
+- `disabled` — ignore Magic Mouse and emulate middle-click only with trackpad.
+
+Default is `center`.
+
+```sh
+defaults write co.myrt.nanomiddleclick mouseClickMode -string threeFinger
+```
+
+## Credits
+
+Heavily inspired by [MiddleClick.app](https://github.com/artginzburg/MiddleClick)
+
+## License
+
+MIT.
