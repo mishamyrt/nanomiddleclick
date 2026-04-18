@@ -106,8 +106,8 @@ pub(crate) fn load_config() -> Result<Config, String> {
         return Err("shim returned no config snapshot".to_string());
     }
 
-    let config = unsafe { config_from_raw(&raw) };
-    unsafe { nmc_free_config(raw_ptr) };
+    let _raw_guard = RawConfigGuard(raw_ptr);
+    let config = config_from_raw(&raw);
     Ok(config)
 }
 
@@ -128,10 +128,13 @@ unsafe fn config_from_raw(raw: &RawConfigSnapshot) -> Config {
             }
 
             ignored_app_bundles.push(
-                unsafe { CStr::from_ptr(*value) }
-                    .to_string_lossy()
-                    .into_owned()
-                    .into_boxed_str(),
+                unsafe {
+                    // Each non-null entry is allocated as a valid C string by the shim.
+                    CStr::from_ptr(*value)
+                }
+                .to_string_lossy()
+                .into_owned()
+                .into_boxed_str(),
             );
         }
     }
@@ -179,4 +182,12 @@ pub(crate) fn run_loop_run() {
 
 pub(crate) fn post_middle_mouse_click() {
     unsafe { nmc_post_middle_mouse_click() }
+}
+
+struct RawConfigGuard(*mut RawConfigSnapshot);
+
+impl Drop for RawConfigGuard {
+    fn drop(&mut self) {
+        unsafe { nmc_free_config(self.0) }
+    }
 }
