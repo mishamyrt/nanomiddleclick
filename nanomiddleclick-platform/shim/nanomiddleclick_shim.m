@@ -401,11 +401,18 @@ static NSDictionary *NMCReadDefaultsDomain(void) {
 
 static uint32_t NMCParseMouseClickMode(id raw_value) {
     if ([raw_value isKindOfClass:[NSNumber class]]) {
-        return ((NSNumber *)raw_value).unsignedIntValue;
+        switch (((NSNumber *)raw_value).unsignedIntValue) {
+            case 0:
+            case 1:
+            case 2:
+                return ((NSNumber *)raw_value).unsignedIntValue;
+            default:
+                return 1;
+        }
     }
 
     if (![raw_value isKindOfClass:[NSString class]]) {
-        return 0;
+        return 1;
     }
 
     NSString *value = [(NSString *)raw_value lowercaseString];
@@ -419,7 +426,7 @@ static uint32_t NMCParseMouseClickMode(id raw_value) {
         return 0;
     }
 
-    return 0;
+    return 1;
 }
 
 static void NMCDrainIterator(io_iterator_t iterator) {

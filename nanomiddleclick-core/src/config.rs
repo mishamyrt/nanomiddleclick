@@ -5,23 +5,28 @@ const DEFAULT_FINGERS: usize = 3;
 const DEFAULT_ALLOW_MORE_FINGERS: bool = false;
 const DEFAULT_MAX_DISTANCE_DELTA: f64 = 0.05;
 const DEFAULT_MAX_TIME_DELTA_MS: u64 = 300;
-const DEFAULT_MOUSE_CLICK_MODE: MouseClickMode = MouseClickMode::Center;
 
 #[repr(u32)]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum MouseClickMode {
     ThreeFinger = 0,
+    #[default]
     Center = 1,
     Disabled = 2,
 }
 
 impl MouseClickMode {
-    pub fn from_raw(raw: u32) -> Self {
+    pub fn try_from_raw(raw: u32) -> Option<Self> {
         match raw {
-            1 => Self::Center,
-            2 => Self::Disabled,
-            _ => Self::ThreeFinger,
+            0 => Some(Self::ThreeFinger),
+            1 => Some(Self::Center),
+            2 => Some(Self::Disabled),
+            _ => None,
         }
+    }
+
+    pub fn from_raw(raw: u32) -> Self {
+        Self::try_from_raw(raw).unwrap_or_default()
     }
 
     pub fn as_str(self) -> &'static str {
@@ -89,7 +94,7 @@ impl Config {
             max_distance_delta: DEFAULT_MAX_DISTANCE_DELTA,
             max_time_delta: Duration::from_millis(DEFAULT_MAX_TIME_DELTA_MS),
             tap_to_click: system_tap_to_click,
-            mouse_click_mode: DEFAULT_MOUSE_CLICK_MODE,
+            mouse_click_mode: MouseClickMode::default(),
             ignored_app_bundles: Vec::new().into_boxed_slice(),
         }
     }
@@ -117,5 +122,22 @@ impl Config {
 impl fmt::Display for Config {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&self.describe())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::MouseClickMode;
+
+    #[test]
+    fn invalid_mouse_click_mode_falls_back_to_documented_default() {
+        assert_eq!(MouseClickMode::from_raw(u32::MAX), MouseClickMode::Center);
+    }
+
+    #[test]
+    fn valid_mouse_click_modes_are_preserved() {
+        assert_eq!(MouseClickMode::from_raw(0), MouseClickMode::ThreeFinger);
+        assert_eq!(MouseClickMode::from_raw(1), MouseClickMode::Center);
+        assert_eq!(MouseClickMode::from_raw(2), MouseClickMode::Disabled);
     }
 }
