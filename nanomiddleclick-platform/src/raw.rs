@@ -111,11 +111,13 @@ pub(crate) fn load_config() -> Result<Config, String> {
     Ok(config)
 }
 
-unsafe fn config_from_raw(raw: &RawConfigSnapshot) -> Config {
+fn config_from_raw(raw: &RawConfigSnapshot) -> Config {
     let mut ignored_app_bundles = Vec::with_capacity(raw.ignored_app_bundles_len);
 
     if !raw.ignored_app_bundles.is_null() && raw.ignored_app_bundles_len > 0 {
         let values = unsafe {
+            // The shim guarantees a contiguous array of
+            // `ignored_app_bundles_len` entries until `nmc_free_config`.
             std::slice::from_raw_parts(
                 raw.ignored_app_bundles,
                 raw.ignored_app_bundles_len,

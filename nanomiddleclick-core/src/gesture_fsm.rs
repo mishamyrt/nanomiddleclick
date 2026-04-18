@@ -147,7 +147,6 @@ impl GestureEngine {
 
     pub fn update_config(&mut self, config: Config) {
         self.config = config;
-        self.reset_for_ignored_app();
     }
 
     pub fn cancel_current_touch_sequence(&mut self) {
@@ -480,6 +479,59 @@ mod tests {
         assert_eq!(
             engine.handle_mouse_event(MouseEventKind::LeftDown),
             MouseAction::RewriteDown
+        );
+    }
+
+    #[test]
+    fn cancel_current_touch_sequence_preserves_pending_rewritten_mouse_up() {
+        let mut engine = GestureEngine::new(config());
+        engine.handle_touch_frame(
+            TouchDeviceKind::Trackpad,
+            [touch(0.1, 0.1), touch(0.2, 0.2), touch(0.3, 0.3)],
+        );
+
+        assert_eq!(
+            engine.handle_mouse_event(MouseEventKind::LeftDown),
+            MouseAction::RewriteDown
+        );
+
+        engine.cancel_current_touch_sequence();
+
+        assert_eq!(
+            engine.handle_mouse_event(MouseEventKind::LeftUp),
+            MouseAction::RewriteUp
+        );
+        assert_eq!(
+            engine.handle_mouse_event(MouseEventKind::LeftDown),
+            MouseAction::Pass
+        );
+    }
+
+    #[test]
+    fn updating_config_does_not_drop_pending_rewritten_mouse_up() {
+        let mut engine = GestureEngine::new(config());
+        engine.handle_touch_frame(
+            TouchDeviceKind::Trackpad,
+            [touch(0.1, 0.1), touch(0.2, 0.2), touch(0.3, 0.3)],
+        );
+
+        assert_eq!(
+            engine.handle_mouse_event(MouseEventKind::LeftDown),
+            MouseAction::RewriteDown
+        );
+
+        let mut updated_config = config();
+        updated_config.mouse_click_mode = MouseClickMode::Disabled;
+        engine.update_config(updated_config);
+        engine.cancel_current_touch_sequence();
+
+        assert_eq!(
+            engine.handle_mouse_event(MouseEventKind::LeftUp),
+            MouseAction::RewriteUp
+        );
+        assert_eq!(
+            engine.handle_mouse_event(MouseEventKind::LeftDown),
+            MouseAction::Pass
         );
     }
 

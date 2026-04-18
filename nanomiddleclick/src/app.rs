@@ -31,6 +31,7 @@ impl App {
                 let frontmost_bundle = lock_or_recover(&self.frontmost_bundle);
                 let mut engine = lock_or_recover(&self.engine);
                 engine.update_config(config);
+                engine.cancel_current_touch_sequence();
 
                 let frontmost_bundle_ignored =
                     frontmost_bundle.as_deref().is_some_and(|bundle_id| {
@@ -52,9 +53,13 @@ impl App {
             return;
         }
 
-        let engine = lock_or_recover(&self.engine);
+        let mut engine = lock_or_recover(&self.engine);
+        let was_ignored = self.frontmost_bundle_ignored.load(Ordering::Relaxed);
         let bundle_ignored = bundle_id
             .is_some_and(|bundle_id| engine.config().is_bundle_ignored(bundle_id));
+        if !was_ignored && bundle_ignored {
+            engine.cancel_current_touch_sequence();
+        }
         *frontmost_bundle = bundle_id.map(str::to_owned).map(String::into_boxed_str);
         self.frontmost_bundle_ignored.store(bundle_ignored, Ordering::Relaxed);
     }
@@ -62,17 +67,11 @@ impl App {
     fn is_frontmost_bundle_ignored(&self) -> bool {
         self.frontmost_bundle_ignored.load(Ordering::Relaxed)
     }
-
-    fn reset_for_ignored_app(&self) {
-        let mut engine = lock_or_recover(&self.engine);
-        engine.reset_for_ignored_app();
-    }
 }
 
 impl EventHandler for App {
     fn handle_touch_frame(&self, touches: TouchFrame<'_>) {
         if self.is_frontmost_bundle_ignored() {
-            self.reset_for_ignored_app();
             return;
         }
 
@@ -88,11 +87,6 @@ impl EventHandler for App {
     }
 
     fn handle_mouse_event(&self, kind: MouseEventKind) -> MouseAction {
-        if self.is_frontmost_bundle_ignored() {
-            self.reset_for_ignored_app();
-            return MouseAction::Pass;
-        }
-
         let mut engine = lock_or_recover(&self.engine);
         engine.handle_mouse_event(kind)
     }
@@ -145,5 +139,62 @@ fn lock_or_recover<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     match mutex.lock() {
         Ok(guard) => guard,
         Err(poisoned) => poisoned.into_inner(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::App;
+    use crate::app::lock_or_recover;
+    use nanomiddleclick_core::{
+        Config, MouseAction, MouseClickMode, MouseEventKind, TouchContact,
+        TouchDeviceKind,
+    };
+    use nanomiddleclick_platform::EventHandler;
+    use std::time::Duration;
+
+    fn config() -> Config {
+        Config {
+            fingers: 3,
+            allow_more_fingers: false,
+            max_distance_delta: 0.05,
+            max_time_delta: Duration::from_millis(300),
+            tap_to_click: true,
+            mouse_click_mode: MouseClickMode::ThreeFinger,
+            ignored_app_bundles: vec!["com.apple.Terminal".into()]
+                .into_boxed_slice(),
+        }
+    }
+
+    fn touch(x: f32, y: f32) -> TouchContact {
+        TouchContact { x, y, touching: true }
+    }
+
+    #[test]
+    fn ignored_app_transition_preserves_pending_rewritten_mouse_up() {
+        let app = App::new(config());
+        {
+            let mut engine = lock_or_recover(&app.engine);
+            engine.handle_touch_frame(
+                TouchDeviceKind::Trackpad,
+                [touch(0.1, 0.1), touch(0.2, 0.2), touch(0.3, 0.3)],
+            );
+        }
+
+        assert_eq!(
+            app.handle_mouse_event(MouseEventKind::LeftDown),
+            MouseAction::RewriteDown
+        );
+
+        app.handle_frontmost_bundle_change(Some("com.apple.Terminal"));
+
+        assert_eq!(
+            app.handle_mouse_event(MouseEventKind::LeftUp),
+            MouseAction::RewriteUp
+        );
+        assert_eq!(
+            app.handle_mouse_event(MouseEventKind::LeftDown),
+            MouseAction::Pass
+        );
     }
 }

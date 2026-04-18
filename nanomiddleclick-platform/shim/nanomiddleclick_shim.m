@@ -66,8 +66,13 @@ static NMCSystemEventCallback g_system_event_callback = NULL;
 static NMCSignalEventCallback g_signal_event_callback = NULL;
 static NMCFrontmostBundleCallback g_frontmost_bundle_callback = NULL;
 
-static NSArray *g_devices = nil;
-static NSMutableDictionary<NSValue *, NSNumber *> *g_touch_device_kinds = nil;
+typedef struct {
+    MTDeviceRef device;
+    NMCTouchDeviceKind kind;
+} NMCTouchDeviceEntry;
+
+static NMCTouchDeviceEntry *g_touch_devices = NULL;
+static size_t g_touch_device_count = 0;
 static CFMachPortRef g_event_tap = NULL;
 static CFRunLoopSourceRef g_event_tap_source = NULL;
 static CFRunLoopRef g_run_loop = NULL;
@@ -83,6 +88,7 @@ static bool g_display_callback_registered = false;
 
 static bool NMCGetSystemTapToClick(void);
 static void NMCDrainIterator(io_iterator_t iterator);
+static void NMCReleaseTouchDeviceList(CFArrayRef list);
 static void NMCStopTouchDevices(void);
 static void NMCStartTouchDevices(void);
 static void NMCStopEventTap(void);
@@ -187,9 +193,10 @@ static bool NMCDeviceHasMousePreferences(MTDeviceRef device) {
 }
 
 static NMCTouchDeviceKind NMCClassifyTouchDevice(MTDeviceRef device) {
-    NSNumber *cached_kind = [g_touch_device_kinds objectForKey:[NSValue valueWithPointer:device]];
-    if (cached_kind != nil) {
-        return (NMCTouchDeviceKind)cached_kind.unsignedIntValue;
+    for (size_t index = 0; index < g_touch_device_count; index += 1) {
+        if (g_touch_devices[index].device == device) {
+            return g_touch_devices[index].kind;
+        }
     }
 
     const io_service_t service = MTDeviceGetService(device);
@@ -436,35 +443,68 @@ static void NMCDrainIterator(io_iterator_t iterator) {
     }
 }
 
+static void NMCReleaseTouchDeviceList(CFArrayRef list) {
+    if (list == NULL) {
+        return;
+    }
+
+    const CFIndex count = CFArrayGetCount(list);
+    for (CFIndex index = 0; index < count; index += 1) {
+        MTDeviceRef device = (MTDeviceRef)CFArrayGetValueAtIndex(list, index);
+        if (device != NULL) {
+            MTDeviceRelease(device);
+        }
+    }
+}
+
 static void NMCStopTouchDevices(void) {
-    for (id device in g_devices) {
-        MTDeviceRef ref = (__bridge MTDeviceRef)device;
+    for (size_t index = 0; index < g_touch_device_count; index += 1) {
+        MTDeviceRef ref = g_touch_devices[index].device;
+        if (ref == NULL) {
+            continue;
+        }
+
         MTUnregisterContactFrameCallback(ref, NMCTouchFrameCallback);
         MTDeviceStop(ref);
         MTDeviceRelease(ref);
     }
 
-    g_devices = nil;
-    g_touch_device_kinds = nil;
+    free(g_touch_devices);
+    g_touch_devices = NULL;
+    g_touch_device_count = 0;
 }
 
 static void NMCStartTouchDevices(void) {
     CFArrayRef list = MTDeviceCreateList();
     if (list == NULL) {
-        g_devices = @[];
-        g_touch_device_kinds = [NSMutableDictionary new];
         return;
     }
 
-    g_devices = CFBridgingRelease(list);
-    g_touch_device_kinds = [NSMutableDictionary new];
-    for (id device in g_devices) {
-        MTDeviceRef ref = (__bridge MTDeviceRef)device;
+    const CFIndex count = CFArrayGetCount(list);
+    if (count <= 0) {
+        CFRelease(list);
+        return;
+    }
+
+    g_touch_devices = calloc((size_t)count, sizeof(*g_touch_devices));
+    if (g_touch_devices == NULL) {
+        NMCReleaseTouchDeviceList(list);
+        CFRelease(list);
+        return;
+    }
+
+    for (CFIndex index = 0; index < count; index += 1) {
+        MTDeviceRef ref = (MTDeviceRef)CFArrayGetValueAtIndex(list, index);
         const NMCTouchDeviceKind kind = NMCClassifyTouchDevice(ref);
-        [g_touch_device_kinds setObject:@(kind) forKey:[NSValue valueWithPointer:ref]];
+        g_touch_devices[g_touch_device_count++] = (NMCTouchDeviceEntry){
+            .device = ref,
+            .kind = kind,
+        };
         MTRegisterContactFrameCallback(ref, NMCTouchFrameCallback);
         MTDeviceStart(ref, 0);
     }
+
+    CFRelease(list);
 }
 
 static void NMCStopEventTap(void) {
