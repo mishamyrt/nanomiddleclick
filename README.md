@@ -8,6 +8,9 @@
   <a href="https://github.com/mishamyrt/nanomiddleclick/actions/workflows/qa.yml">
       <img src="https://github.com/mishamyrt/nanomiddleclick/actions/workflows/qa.yml/badge.svg" />
   </a>
+  <a href="https://github.com/mishamyrt/nanomiddleclick/releases/latest">
+    <img src="https://img.shields.io/github/v/tag/mishamyrt/nanomiddleclick?label=version"
+  </a>
 </p>
 
 Lightweight daemon for middle-click emulation on macOS.
@@ -26,6 +29,12 @@ Lightweight daemon for middle-click emulation on macOS.
 To open links in a new tab or close tabs in browsers with a single action using one hand (without pressing cmd) and paste highlighted text in the Terminal app.
 
 ## Installation
+
+### Brew
+
+```sh
+brew install mishamyrt/tap/nanomiddleclick
+```
 
 ### From source
 
