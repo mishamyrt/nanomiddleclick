@@ -1,4 +1,5 @@
 mod app;
+mod launchd;
 mod logging;
 
 use std::env;
@@ -6,9 +7,11 @@ use std::process::ExitCode;
 use std::sync::Arc;
 
 use app::App;
+use launchd::build_agent_config;
 use nanomiddleclick_core::Config;
-use nanomiddleclick_launchd as launchd;
 use nanomiddleclick_platform as platform;
+
+use crate::launchd::LaunchAgentError;
 
 #[allow(clippy::print_stderr, clippy::print_stdout)]
 fn main() -> ExitCode {
@@ -22,34 +25,38 @@ fn main() -> ExitCode {
             println!("{}", env!("CARGO_PKG_VERSION"));
             ExitCode::SUCCESS
         }
-        Ok(Command::DaemonOn) => match env::current_exe() {
-            Ok(executable_path) => match launchd::install(&executable_path) {
-                Ok(plist_path) => {
-                    println!("launchd agent installed at {}", plist_path.display());
-                    ExitCode::SUCCESS
-                }
-                Err(error) => {
-                    log_error!("{error}");
-                    ExitCode::FAILURE
-                }
-            },
-            Err(error) => {
-                log_error!("failed to resolve current executable path: {error}");
-                ExitCode::FAILURE
-            }
-        },
-        Ok(Command::DaemonOff) => match launchd::uninstall() {
-            Ok(plist_path) => {
-                println!("launchd agent removed from {}", plist_path.display());
-                ExitCode::SUCCESS
-            }
-            Err(error) => {
-                log_error!("{error}");
-                ExitCode::FAILURE
-            }
-        },
+        Ok(Command::DaemonOn) => run_launchctl_action(install_launch_agent),
+        Ok(Command::DaemonOff) => run_launchctl_action(uninstall_launch_agent),
         Err(error) => {
             eprintln!("{error}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+fn install_launch_agent() -> Result<String, LaunchAgentError> {
+    let agent = build_agent_config()?;
+    agent.install()?;
+    Ok(format!("launchd agent installed at {}", agent.path()?.to_string_lossy()))
+}
+
+fn uninstall_launch_agent() -> Result<String, LaunchAgentError> {
+    let agent = build_agent_config()?;
+    agent.uninstall()?;
+    Ok(format!("launchd agent uninstalled from {}", agent.path()?.to_string_lossy()))
+}
+
+#[allow(clippy::print_stdout)]
+fn run_launchctl_action(
+    action: impl FnOnce() -> Result<String, LaunchAgentError>,
+) -> ExitCode {
+    match action() {
+        Ok(message) => {
+            println!("{message}");
+            ExitCode::SUCCESS
+        }
+        Err(error) => {
+            log_error!("{error}");
             ExitCode::FAILURE
         }
     }

@@ -1,12 +1,11 @@
 [workspace]
-members = [
-  "nanomiddleclick-core",
-  "nanomiddleclick-platform",
-  "nanomiddleclick-launchd",
-  "nanomiddleclick",
-]
+members = ["nanomiddleclick-core", "nanomiddleclick-platform", "nanomiddleclick"]
 default-members = ["nanomiddleclick"]
 resolver = "3"
+
+[workspace.dependencies]
+lunchd = "0.1.1"
+thiserror = "2.0.18"
 
 [workspace.package]
 version = "0.1.0"

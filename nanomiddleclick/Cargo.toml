@@ -15,8 +15,9 @@ path = "src/main.rs"
 
 [dependencies]
 nanomiddleclick-core = { path = "../nanomiddleclick-core" }
-nanomiddleclick-launchd = { path = "../nanomiddleclick-launchd" }
 nanomiddleclick-platform = { path = "../nanomiddleclick-platform" }
+lunchd = { workspace = true }
+thiserror = { workspace = true }
 
 [lints]
 workspace = true
