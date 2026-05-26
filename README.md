@@ -1,5 +1,5 @@
 <p align="center">
-    <img src="./docs/logo.svg" width="50px" />
+    <img src="./docs/logo.svg" width="100px" />
 </p>
 
 <h1 align="center">nanomiddleclick</h1>
