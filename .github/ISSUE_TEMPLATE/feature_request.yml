@@ -1,0 +1,56 @@
+name: Feature request
+description: Suggest an improvement or new behavior for nanomiddleclick.
+title: "feat: "
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting an improvement. Please describe the use case before proposing an implementation.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      description: What are you trying to do, and why is the current behavior not enough?
+      placeholder: Describe the user problem this feature would solve.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What behavior or configuration would you like to add?
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What workarounds or alternative designs did you consider?
+
+  - type: dropdown
+    id: device
+    attributes:
+      label: Relevant input device
+      options:
+        - MacBook trackpad
+        - Magic Trackpad
+        - Magic Mouse
+        - All supported devices
+        - Not device-specific
+        - Other
+
+  - type: textarea
+    id: compatibility
+    attributes:
+      label: Compatibility considerations
+      description: Could this affect existing gestures, configuration, or daemon behavior?
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Additional context
+      description: Add examples, references, or screenshots if useful.

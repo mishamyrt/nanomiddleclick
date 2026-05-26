@@ -1,0 +1,95 @@
+name: Bug report
+description: Report a reproducible problem with nanomiddleclick.
+title: "bug: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. Please include enough detail to reproduce the issue on macOS.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What happened, and what did you expect to happen?
+      placeholder: Describe the problem in a few sentences.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Provide the smallest sequence of steps that reproduces the problem.
+      placeholder: |
+        1. Start nanomiddleclick with ...
+        2. Configure ...
+        3. Perform ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What did nanomiddleclick do?
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What should nanomiddleclick do instead?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: device
+    attributes:
+      label: Input device
+      options:
+        - MacBook trackpad
+        - Magic Trackpad
+        - Magic Mouse
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      placeholder: "Example: macOS 15.2"
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: nanomiddleclick version
+      placeholder: "Example: v0.1.0, latest main, or commit hash"
+    validations:
+      required: true
+
+  - type: textarea
+    id: config
+    attributes:
+      label: Configuration
+      description: Include relevant `defaults read co.myrt.nanomiddleclick` output, if available.
+      render: sh
+      placeholder: defaults read co.myrt.nanomiddleclick
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or diagnostics
+      description: Include relevant terminal output, crash logs, or daemon logs.
+      render: text
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Additional context
+      description: Add anything else that may help diagnose the issue.
