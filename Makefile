@@ -14,7 +14,7 @@ test:
 	cargo test --all-features
 
 install:
-	cargo install --path .
+	cargo install --path nanomiddleclick
 
 publish:
 	@sed -E 's/^version = "[^"]+"/version = "${VERSION}"/' Cargo.toml > Cargo.toml.tmp
