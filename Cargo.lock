@@ -95,21 +95,31 @@ name = "nanomiddleclick"
 version = "0.1.0"
 dependencies = [
  "lunchd",
+ "nanomiddleclick-app-monitor",
  "nanomiddleclick-core",
- "nanomiddleclick-platform",
+ "nanomiddleclick-input",
+ "nanomiddleclick-preferences",
  "thiserror",
 ]
 
 [[package]]
-name = "nanomiddleclick-core"
+name = "nanomiddleclick-app-monitor"
 version = "0.1.0"
 
 [[package]]
-name = "nanomiddleclick-platform"
+name = "nanomiddleclick-core"
 version = "0.1.0"
 dependencies = [
- "nanomiddleclick-core",
+ "nanomiddleclick-input",
 ]
+
+[[package]]
+name = "nanomiddleclick-input"
+version = "0.1.0"
+
+[[package]]
+name = "nanomiddleclick-preferences"
+version = "0.1.0"
 
 [[package]]
 name = "proc-macro2"

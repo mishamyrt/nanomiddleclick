@@ -4,8 +4,8 @@ use std::sync::{Mutex, MutexGuard};
 use nanomiddleclick_core::{
     Config, GestureEngine, GestureOutcome, MouseAction, MouseEventKind,
 };
-use nanomiddleclick_platform::{
-    self as platform, EventHandler, SignalKind, SystemEventKind, TouchFrame,
+use nanomiddleclick_input::{
+    self as input, SignalKind, SystemEventKind, TouchFrame,
 };
 
 pub struct App {
@@ -24,7 +24,7 @@ impl App {
     }
 
     fn reload_config(&self) {
-        match platform::load_config() {
+        match crate::settings::load_config() {
             Ok(config) => {
                 crate::log_info!("reloaded config: {config}");
                 let monitor_frontmost_bundle =
@@ -45,7 +45,7 @@ impl App {
                         .store(frontmost_bundle_ignored, Ordering::Relaxed);
                 }
 
-                platform::set_frontmost_bundle_monitor_enabled(
+                nanomiddleclick_app_monitor::set_frontmost_bundle_monitor_enabled(
                     monitor_frontmost_bundle,
                 );
                 if !monitor_frontmost_bundle {
@@ -81,7 +81,7 @@ impl App {
     }
 }
 
-impl EventHandler for App {
+impl input::EventHandler for App {
     fn handle_touch_frame(&self, touches: TouchFrame<'_>) {
         if self.is_frontmost_bundle_ignored() {
             return;
@@ -94,7 +94,7 @@ impl EventHandler for App {
 
         if let GestureOutcome::EmulateMiddleClick = outcome {
             crate::log_info!("emulating middle click from touch sequence");
-            platform::post_middle_mouse_click();
+            input::post_mouse_click(input::MouseButton::Middle);
         }
     }
 
@@ -110,9 +110,6 @@ impl EventHandler for App {
                     "multitouch device list changed; restarting listeners"
                 );
             }
-            SystemEventKind::Wake => {
-                crate::log_info!("system woke up; restarting listeners");
-            }
             SystemEventKind::DisplayReconfigured => {
                 crate::log_info!(
                     "display configuration changed; restarting listeners"
@@ -120,7 +117,7 @@ impl EventHandler for App {
             }
         }
 
-        if platform::restart_listeners() {
+        if input::restart_listeners() {
             crate::log_info!("listeners restarted successfully");
         } else {
             crate::log_warn!("listener restart completed in degraded mode");
@@ -133,12 +130,31 @@ impl EventHandler for App {
                 crate::log_info!("received SIGHUP; reloading config and listeners");
                 self.reload_config();
 
-                if platform::restart_listeners() {
+                if input::restart_listeners() {
                     crate::log_info!("listeners reloaded successfully");
                 } else {
                     crate::log_warn!("listener reload completed in degraded mode");
                 }
             }
+        }
+    }
+}
+
+impl nanomiddleclick_app_monitor::EventHandler for App {
+    fn handle_app_monitor_event(
+        &self,
+        kind: nanomiddleclick_app_monitor::EventKind,
+    ) {
+        match kind {
+            nanomiddleclick_app_monitor::EventKind::Wake => {
+                crate::log_info!("system woke up; restarting listeners");
+            }
+        }
+
+        if input::restart_listeners() {
+            crate::log_info!("listeners restarted successfully");
+        } else {
+            crate::log_warn!("listener restart completed in degraded mode");
         }
     }
 
@@ -158,11 +174,12 @@ fn lock_or_recover<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
 mod tests {
     use super::App;
     use crate::app::lock_or_recover;
+    use nanomiddleclick_app_monitor::EventHandler as AppMonitorEventHandler;
     use nanomiddleclick_core::{
         Config, MouseAction, MouseClickMode, MouseEventKind, TouchContact,
         TouchDeviceKind,
     };
-    use nanomiddleclick_platform::EventHandler;
+    use nanomiddleclick_input::EventHandler as InputEventHandler;
     use std::time::Duration;
 
     fn config() -> Config {

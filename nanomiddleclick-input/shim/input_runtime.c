@@ -7,7 +7,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#include "nanomiddleclick_shim.h"
+#include "nanomiddleclick_input.h"
 
 typedef struct {
     MTDeviceRef device;
@@ -176,15 +176,33 @@ static void NMCDisplayReconfigurationCallback(CGDirectDisplayID display, CGDispl
     }
 }
 
+bool nmc_is_accessibility_trusted(bool prompt) {
+    const void *keys[] = { kAXTrustedCheckOptionPrompt };
+    const void *values[] = { prompt ? kCFBooleanTrue : kCFBooleanFalse };
+    CFDictionaryRef options = CFDictionaryCreate(
+        kCFAllocatorDefault,
+        keys,
+        values,
+        1,
+        &kCFTypeDictionaryKeyCallBacks,
+        &kCFTypeDictionaryValueCallBacks
+    );
+    if (options == NULL) {
+        return AXIsProcessTrustedWithOptions(NULL);
+    }
+
+    const bool trusted = AXIsProcessTrustedWithOptions(options);
+    CFRelease(options);
+    return trusted;
+}
+
 bool nmc_restart_listeners(void);
 
 bool nmc_start(
     NMCTouchCallback touch_callback,
     NMCMouseEventCallback mouse_callback,
     NMCSystemEventCallback system_callback,
-    NMCSignalEventCallback signal_callback,
-    NMCFrontmostBundleCallback frontmost_bundle_callback,
-    bool monitor_frontmost_bundle
+    NMCSignalEventCallback signal_callback
 ) {
     g_touch_callback = touch_callback;
     g_mouse_event_callback = mouse_callback;
@@ -193,21 +211,10 @@ bool nmc_start(
     g_run_loop = CFRunLoopGetCurrent();
 
     NMCStartDeviceMonitor();
-    NMCStartWorkspaceMonitor(
-        system_callback,
-        monitor_frontmost_bundle ? frontmost_bundle_callback : NULL
-    );
     NMCStartDisplayObserver();
     NMCStartSignalMonitor();
 
     return nmc_restart_listeners();
-}
-
-void nmc_set_frontmost_bundle_monitor_enabled(
-    NMCFrontmostBundleCallback frontmost_bundle_callback,
-    bool enabled
-) {
-    NMCSetFrontmostBundleMonitorEnabled(enabled ? frontmost_bundle_callback : NULL);
 }
 
 bool nmc_restart_listeners(void) {
@@ -221,7 +228,6 @@ void nmc_stop(void) {
     NMCStopTouchDevices();
     NMCStopEventTap();
     NMCStopDeviceMonitor();
-    NMCStopWorkspaceMonitor();
     NMCStopDisplayObserver();
     NMCStopSignalMonitor();
 }

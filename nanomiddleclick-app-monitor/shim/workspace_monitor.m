@@ -1,8 +1,8 @@
 #import <AppKit/AppKit.h>
 
-#import "nanomiddleclick_shim.h"
+#import "nanomiddleclick_app_monitor.h"
 
-static NMCSystemEventCallback g_system_event_callback = NULL;
+static NMCAppMonitorEventCallback g_event_callback = NULL;
 static NMCFrontmostBundleCallback g_frontmost_bundle_callback = NULL;
 static id g_wake_observer = nil;
 static id g_activation_observer = nil;
@@ -14,10 +14,10 @@ static void NMCStopActivationObserver(void);
 static void NMCNotifyFrontmostBundle(void);
 
 void NMCStartWorkspaceMonitor(
-    NMCSystemEventCallback system_callback,
+    NMCAppMonitorEventCallback event_callback,
     NMCFrontmostBundleCallback frontmost_bundle_callback
 ) {
-    g_system_event_callback = system_callback;
+    g_event_callback = event_callback;
 
     NMCStartWakeObserver();
     NMCSetFrontmostBundleMonitorEnabled(frontmost_bundle_callback);
@@ -38,7 +38,7 @@ void NMCSetFrontmostBundleMonitorEnabled(
 void NMCStopWorkspaceMonitor(void) {
     NMCStopWakeObserver();
     NMCStopActivationObserver();
-    g_system_event_callback = NULL;
+    g_event_callback = NULL;
     g_frontmost_bundle_callback = NULL;
 }
 
@@ -52,8 +52,8 @@ static void NMCStartWakeObserver(void) {
         object:nil
         queue:nil
         usingBlock:^(__unused NSNotification *note) {
-            if (g_system_event_callback != NULL) {
-                g_system_event_callback(NMCSystemEventKindWake);
+            if (g_event_callback != NULL) {
+                g_event_callback(NMCAppMonitorEventKindWake);
             }
         }];
 }

@@ -1,16 +1,24 @@
 mod raw;
 
-use std::ffi::CStr;
 use std::slice;
 use std::sync::{Arc, OnceLock};
 
-use nanomiddleclick_core::{
-    Config, MouseAction, MouseEventKind, TouchDeviceKind, TouchSource,
-};
-
-pub const DEFAULTS_DOMAIN: &str = "co.myrt.nanomiddleclick";
-
 static HANDLER: OnceLock<Arc<dyn EventHandler>> = OnceLock::new();
+
+pub trait TouchSource {
+    fn is_touching(&self) -> bool;
+    fn normalized_position(&self) -> (f32, f32);
+}
+
+impl<T: TouchSource + ?Sized> TouchSource for &T {
+    fn is_touching(&self) -> bool {
+        (*self).is_touching()
+    }
+
+    fn normalized_position(&self) -> (f32, f32) {
+        (*self).normalized_position()
+    }
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct TouchFrame<'a> {
@@ -46,19 +54,77 @@ impl TouchSource for Touch<'_> {
 }
 
 #[repr(u32)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum TouchDeviceKind {
+    #[default]
+    Unknown = 0,
+    Mouse = 1,
+    Trackpad = 2,
+}
+
+impl TouchDeviceKind {
+    pub fn from_raw(raw: u32) -> Option<Self> {
+        match raw {
+            0 => Some(Self::Unknown),
+            1 => Some(Self::Mouse),
+            2 => Some(Self::Trackpad),
+            _ => None,
+        }
+    }
+}
+
+#[repr(u32)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum MouseEventKind {
+    LeftDown = 1,
+    LeftUp = 2,
+    RightDown = 3,
+    RightUp = 4,
+}
+
+impl MouseEventKind {
+    pub fn from_raw(raw: u32) -> Option<Self> {
+        match raw {
+            1 => Some(Self::LeftDown),
+            2 => Some(Self::LeftUp),
+            3 => Some(Self::RightDown),
+            4 => Some(Self::RightUp),
+            _ => None,
+        }
+    }
+}
+
+#[repr(u32)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum MouseAction {
+    Pass = 0,
+    RewriteDown = 1,
+    RewriteUp = 2,
+}
+
+impl MouseAction {
+    pub fn as_raw(self) -> u32 {
+        self as u32
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum MouseButton {
+    Middle,
+}
+
+#[repr(u32)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SystemEventKind {
     DeviceAdded = 1,
-    Wake = 2,
-    DisplayReconfigured = 3,
+    DisplayReconfigured = 2,
 }
 
 impl SystemEventKind {
     fn from_raw(raw: u32) -> Option<Self> {
         match raw {
             1 => Some(Self::DeviceAdded),
-            2 => Some(Self::Wake),
-            3 => Some(Self::DisplayReconfigured),
+            2 => Some(Self::DisplayReconfigured),
             _ => None,
         }
     }
@@ -84,7 +150,6 @@ pub trait EventHandler: Send + Sync {
     fn handle_mouse_event(&self, kind: MouseEventKind) -> MouseAction;
     fn handle_system_event(&self, kind: SystemEventKind);
     fn handle_signal(&self, kind: SignalKind);
-    fn handle_frontmost_bundle_change(&self, bundle_id: Option<&str>);
 }
 
 pub fn install_event_handler(
@@ -93,31 +158,17 @@ pub fn install_event_handler(
     HANDLER.set(handler).map_err(|_| "event handler already installed")
 }
 
-pub fn load_config() -> Result<Config, String> {
-    raw::load_config()
-}
-
 pub fn is_accessibility_trusted(prompt: bool) -> bool {
     raw::is_accessibility_trusted(prompt)
 }
 
-pub fn system_tap_to_click() -> bool {
-    raw::system_tap_to_click()
-}
-
-pub fn start(monitor_frontmost_bundle: bool) -> bool {
+pub fn start() -> bool {
     raw::start(
         touch_frame_callback,
         mouse_event_callback,
         system_event_callback,
         signal_callback,
-        frontmost_bundle_callback,
-        monitor_frontmost_bundle,
     )
-}
-
-pub fn set_frontmost_bundle_monitor_enabled(enabled: bool) {
-    raw::set_frontmost_bundle_monitor_enabled(frontmost_bundle_callback, enabled);
 }
 
 pub fn restart_listeners() -> bool {
@@ -132,8 +183,10 @@ pub fn run_loop_run() {
     raw::run_loop_run();
 }
 
-pub fn post_middle_mouse_click() {
-    raw::post_middle_mouse_click();
+pub fn post_mouse_click(button: MouseButton) {
+    match button {
+        MouseButton::Middle => raw::post_middle_mouse_click(),
+    }
 }
 
 extern "C" fn touch_frame_callback(
@@ -189,20 +242,6 @@ extern "C" fn signal_callback(kind: u32) {
     if let Some(handler) = handler() {
         handler.handle_signal(kind);
     }
-}
-
-extern "C" fn frontmost_bundle_callback(bundle_id: *const std::ffi::c_char) {
-    let Some(handler) = handler() else {
-        return;
-    };
-
-    if bundle_id.is_null() {
-        handler.handle_frontmost_bundle_change(None);
-        return;
-    }
-
-    let bundle_id = unsafe { CStr::from_ptr(bundle_id) }.to_string_lossy();
-    handler.handle_frontmost_bundle_change(Some(bundle_id.as_ref()));
 }
 
 fn handler() -> Option<&'static Arc<dyn EventHandler>> {

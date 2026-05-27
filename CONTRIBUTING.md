@@ -19,8 +19,10 @@ rustup component add rustfmt clippy
 ## Project Layout
 
 - `nanomiddleclick` contains the CLI and daemon application.
-- `nanomiddleclick-core` contains platform-independent configuration and gesture logic.
-- `nanomiddleclick-platform` contains macOS-specific integration code and the native shim.
+- `nanomiddleclick-core` contains configuration and gesture orchestration.
+- `nanomiddleclick-input` contains macOS input runtime code and the native multitouch/event-tap shim.
+- `nanomiddleclick-preferences` contains generic macOS preferences access.
+- `nanomiddleclick-app-monitor` contains generic macOS workspace/frontmost-app monitoring.
 - `.github/workflows/qa.yml` defines the checks that run in CI.
 
 ## Development Workflow
@@ -77,8 +79,8 @@ For changes that affect input handling, configuration, daemon startup, or launch
 
 - Keep changes small, direct, and easy to review.
 - Prefer clear Rust code over clever abstractions.
-- Keep platform-independent logic in `nanomiddleclick-core` when possible.
-- Keep macOS-specific behavior in `nanomiddleclick-platform` or the native shim.
+- Keep product-specific orchestration in `nanomiddleclick` or `nanomiddleclick-core`.
+- Keep reusable macOS behavior in the focused platform crates and their native shims.
 - Avoid new dependencies unless they materially simplify the implementation or improve correctness.
 - Do not commit generated build artifacts from `target/`.
 

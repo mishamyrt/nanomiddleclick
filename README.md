@@ -28,6 +28,12 @@ Lightweight daemon for middle-click emulation on macOS.
 
 To open links in a new tab or close tabs in browsers with a single action using one hand (without pressing cmd) and paste highlighted text in the Terminal app.
 
+## Why is there no UI?
+
+I don't think these kinds of background apps need any UI or menu items. The background daemon is launched once, configured via the terminal, and then left for a long time.
+
+It just works, consuming the minimum possible resources.
+
 ## Installation
 
 ### Brew

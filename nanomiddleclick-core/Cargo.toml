@@ -3,5 +3,8 @@ name = "nanomiddleclick-core"
 version = { workspace = true }
 edition = { workspace = true }
 
+[dependencies]
+nanomiddleclick-input = { path = "../nanomiddleclick-input" }
+
 [lints]
 workspace = true

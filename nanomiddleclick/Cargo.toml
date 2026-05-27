@@ -14,8 +14,10 @@ name = "nanomiddleclick"
 path = "src/main.rs"
 
 [dependencies]
+nanomiddleclick-app-monitor = { path = "../nanomiddleclick-app-monitor" }
 nanomiddleclick-core = { path = "../nanomiddleclick-core" }
-nanomiddleclick-platform = { path = "../nanomiddleclick-platform" }
+nanomiddleclick-input = { path = "../nanomiddleclick-input" }
+nanomiddleclick-preferences = { path = "../nanomiddleclick-preferences" }
 lunchd = { workspace = true }
 thiserror = { workspace = true }
 

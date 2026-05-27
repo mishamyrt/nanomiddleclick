@@ -1,6 +1,7 @@
 mod app;
 mod launchd;
 mod logging;
+mod settings;
 
 use std::env;
 use std::process::ExitCode;
@@ -9,7 +10,6 @@ use std::sync::Arc;
 use app::App;
 use launchd::build_agent_config;
 use nanomiddleclick_core::Config;
-use nanomiddleclick_platform as platform;
 
 use crate::launchd::LaunchAgentError;
 
@@ -63,38 +63,46 @@ fn run_launchctl_action(
 }
 
 fn run_daemon() {
-    let config = match platform::load_config() {
+    let config = match settings::load_config() {
         Ok(config) => config,
         Err(error) => {
             log_error!("failed to load config: {error}");
-            Config::fallback(platform::system_tap_to_click())
+            Config::fallback(nanomiddleclick_preferences::system_tap_to_click())
         }
     };
 
-    log_info!("starting nanomiddleclick with domain {}", platform::DEFAULTS_DOMAIN);
+    log_info!("starting nanomiddleclick with domain {}", settings::DEFAULTS_DOMAIN);
     log_info!("config: {config}");
     let monitor_frontmost_bundle = !config.ignored_app_bundles.is_empty();
 
-    if !platform::is_accessibility_trusted(false) {
+    if !nanomiddleclick_input::is_accessibility_trusted(false) {
         log_warn!(
             "Accessibility permission is not granted; click rewriting may stay inactive until permission is granted and listeners are reloaded"
         );
     }
 
+    let app = Arc::new(App::new(config));
     assert!(
-        platform::install_event_handler(Arc::new(App::new(config))).is_ok(),
-        "event handler should only be initialized once"
+        nanomiddleclick_input::install_event_handler(app.clone()).is_ok(),
+        "input event handler should only be initialized once"
+    );
+    assert!(
+        nanomiddleclick_app_monitor::install_event_handler(app).is_ok(),
+        "app monitor event handler should only be initialized once"
     );
 
-    let listeners_active = platform::start(monitor_frontmost_bundle);
+    nanomiddleclick_app_monitor::start(monitor_frontmost_bundle);
+
+    let listeners_active = nanomiddleclick_input::start();
     if listeners_active {
         log_info!("listeners activated");
     } else {
         log_warn!("listeners started in degraded mode");
     }
 
-    platform::run_loop_run();
-    platform::stop();
+    nanomiddleclick_input::run_loop_run();
+    nanomiddleclick_app_monitor::stop();
+    nanomiddleclick_input::stop();
     log_info!("nanomiddleclick stopped");
 }
 

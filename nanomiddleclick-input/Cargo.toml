@@ -1,11 +1,8 @@
 [package]
-name = "nanomiddleclick-platform"
+name = "nanomiddleclick-input"
 version = { workspace = true }
 edition = { workspace = true }
 build = "build.rs"
-
-[dependencies]
-nanomiddleclick-core = { path = "../nanomiddleclick-core" }
 
 [lints]
 workspace = true

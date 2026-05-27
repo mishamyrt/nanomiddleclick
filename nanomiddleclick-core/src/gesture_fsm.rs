@@ -1,21 +1,9 @@
 use std::time::{Duration, Instant};
 
 use crate::{Config, MouseClickMode};
-
-pub trait TouchSource {
-    fn is_touching(&self) -> bool;
-    fn normalized_position(&self) -> (f32, f32);
-}
-
-impl<T: TouchSource + ?Sized> TouchSource for &T {
-    fn is_touching(&self) -> bool {
-        (*self).is_touching()
-    }
-
-    fn normalized_position(&self) -> (f32, f32) {
-        (*self).normalized_position()
-    }
-}
+use nanomiddleclick_input::{
+    MouseAction, MouseEventKind, TouchDeviceKind, TouchSource,
+};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct TouchContact {
@@ -31,61 +19,6 @@ impl TouchSource for TouchContact {
 
     fn normalized_position(&self) -> (f32, f32) {
         (self.x, self.y)
-    }
-}
-
-#[repr(u32)]
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub enum TouchDeviceKind {
-    #[default]
-    Unknown = 0,
-    Mouse = 1,
-    Trackpad = 2,
-}
-
-impl TouchDeviceKind {
-    pub fn from_raw(raw: u32) -> Option<Self> {
-        match raw {
-            0 => Some(Self::Unknown),
-            1 => Some(Self::Mouse),
-            2 => Some(Self::Trackpad),
-            _ => None,
-        }
-    }
-}
-
-#[repr(u32)]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum MouseEventKind {
-    LeftDown = 1,
-    LeftUp = 2,
-    RightDown = 3,
-    RightUp = 4,
-}
-
-impl MouseEventKind {
-    pub fn from_raw(raw: u32) -> Option<Self> {
-        match raw {
-            1 => Some(Self::LeftDown),
-            2 => Some(Self::LeftUp),
-            3 => Some(Self::RightDown),
-            4 => Some(Self::RightUp),
-            _ => None,
-        }
-    }
-}
-
-#[repr(u32)]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum MouseAction {
-    Pass = 0,
-    RewriteDown = 1,
-    RewriteUp = 2,
-}
-
-impl MouseAction {
-    pub fn as_raw(self) -> u32 {
-        self as u32
     }
 }
 

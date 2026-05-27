@@ -1,5 +1,11 @@
 [workspace]
-members = ["nanomiddleclick-core", "nanomiddleclick-platform", "nanomiddleclick"]
+members = [
+    "nanomiddleclick-app-monitor",
+    "nanomiddleclick-core",
+    "nanomiddleclick-input",
+    "nanomiddleclick-preferences",
+    "nanomiddleclick",
+]
 default-members = ["nanomiddleclick"]
 resolver = "3"
 
