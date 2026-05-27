@@ -27,19 +27,31 @@ impl App {
         match platform::load_config() {
             Ok(config) => {
                 crate::log_info!("reloaded config: {config}");
+                let monitor_frontmost_bundle =
+                    !config.ignored_app_bundles.is_empty();
 
-                let frontmost_bundle = lock_or_recover(&self.frontmost_bundle);
-                let mut engine = lock_or_recover(&self.engine);
-                engine.update_config(config);
-                engine.cancel_current_touch_sequence();
+                {
+                    let frontmost_bundle = lock_or_recover(&self.frontmost_bundle);
+                    let mut engine = lock_or_recover(&self.engine);
+                    engine.update_config(config);
+                    engine.cancel_current_touch_sequence();
 
-                let frontmost_bundle_ignored =
-                    frontmost_bundle.as_deref().is_some_and(|bundle_id| {
-                        engine.config().is_bundle_ignored(bundle_id)
-                    });
+                    let frontmost_bundle_ignored =
+                        frontmost_bundle.as_deref().is_some_and(|bundle_id| {
+                            engine.config().is_bundle_ignored(bundle_id)
+                        });
 
-                self.frontmost_bundle_ignored
-                    .store(frontmost_bundle_ignored, Ordering::Relaxed);
+                    self.frontmost_bundle_ignored
+                        .store(frontmost_bundle_ignored, Ordering::Relaxed);
+                }
+
+                platform::set_frontmost_bundle_monitor_enabled(
+                    monitor_frontmost_bundle,
+                );
+                if !monitor_frontmost_bundle {
+                    *lock_or_recover(&self.frontmost_bundle) = None;
+                    self.frontmost_bundle_ignored.store(false, Ordering::Relaxed);
+                }
             }
             Err(error) => {
                 crate::log_error!("failed to reload config: {error}");

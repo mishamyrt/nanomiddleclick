@@ -183,7 +183,8 @@ bool nmc_start(
     NMCMouseEventCallback mouse_callback,
     NMCSystemEventCallback system_callback,
     NMCSignalEventCallback signal_callback,
-    NMCFrontmostBundleCallback frontmost_bundle_callback
+    NMCFrontmostBundleCallback frontmost_bundle_callback,
+    bool monitor_frontmost_bundle
 ) {
     g_touch_callback = touch_callback;
     g_mouse_event_callback = mouse_callback;
@@ -192,11 +193,21 @@ bool nmc_start(
     g_run_loop = CFRunLoopGetCurrent();
 
     NMCStartDeviceMonitor();
-    NMCStartWorkspaceMonitor(system_callback, frontmost_bundle_callback);
+    NMCStartWorkspaceMonitor(
+        system_callback,
+        monitor_frontmost_bundle ? frontmost_bundle_callback : NULL
+    );
     NMCStartDisplayObserver();
     NMCStartSignalMonitor();
 
     return nmc_restart_listeners();
+}
+
+void nmc_set_frontmost_bundle_monitor_enabled(
+    NMCFrontmostBundleCallback frontmost_bundle_callback,
+    bool enabled
+) {
+    NMCSetFrontmostBundleMonitorEnabled(enabled ? frontmost_bundle_callback : NULL);
 }
 
 bool nmc_restart_listeners(void) {

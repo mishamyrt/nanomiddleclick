@@ -18,10 +18,21 @@ void NMCStartWorkspaceMonitor(
     NMCFrontmostBundleCallback frontmost_bundle_callback
 ) {
     g_system_event_callback = system_callback;
-    g_frontmost_bundle_callback = frontmost_bundle_callback;
 
     NMCStartWakeObserver();
-    NMCStartActivationObserver();
+    NMCSetFrontmostBundleMonitorEnabled(frontmost_bundle_callback);
+}
+
+void NMCSetFrontmostBundleMonitorEnabled(
+    NMCFrontmostBundleCallback frontmost_bundle_callback
+) {
+    g_frontmost_bundle_callback = frontmost_bundle_callback;
+
+    if (frontmost_bundle_callback == NULL) {
+        NMCStopActivationObserver();
+    } else {
+        NMCStartActivationObserver();
+    }
 }
 
 void NMCStopWorkspaceMonitor(void) {

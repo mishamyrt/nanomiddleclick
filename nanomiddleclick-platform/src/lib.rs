@@ -105,14 +105,19 @@ pub fn system_tap_to_click() -> bool {
     raw::system_tap_to_click()
 }
 
-pub fn start() -> bool {
+pub fn start(monitor_frontmost_bundle: bool) -> bool {
     raw::start(
         touch_frame_callback,
         mouse_event_callback,
         system_event_callback,
         signal_callback,
         frontmost_bundle_callback,
+        monitor_frontmost_bundle,
     )
+}
+
+pub fn set_frontmost_bundle_monitor_enabled(enabled: bool) {
+    raw::set_frontmost_bundle_monitor_enabled(frontmost_bundle_callback, enabled);
 }
 
 pub fn restart_listeners() -> bool {

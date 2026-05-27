@@ -73,6 +73,7 @@ fn run_daemon() {
 
     log_info!("starting nanomiddleclick with domain {}", platform::DEFAULTS_DOMAIN);
     log_info!("config: {config}");
+    let monitor_frontmost_bundle = !config.ignored_app_bundles.is_empty();
 
     if !platform::is_accessibility_trusted(false) {
         log_warn!(
@@ -85,7 +86,7 @@ fn run_daemon() {
         "event handler should only be initialized once"
     );
 
-    let listeners_active = platform::start();
+    let listeners_active = platform::start(monitor_frontmost_bundle);
     if listeners_active {
         log_info!("listeners activated");
     } else {

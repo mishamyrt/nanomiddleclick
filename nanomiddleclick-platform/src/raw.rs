@@ -74,7 +74,12 @@ unsafe extern "C" {
         system_callback: SystemEventCallback,
         signal_callback: SignalEventCallback,
         frontmost_bundle_callback: FrontmostBundleCallback,
+        monitor_frontmost_bundle: bool,
     ) -> bool;
+    fn nmc_set_frontmost_bundle_monitor_enabled(
+        frontmost_bundle_callback: FrontmostBundleCallback,
+        enabled: bool,
+    );
     fn nmc_restart_listeners() -> bool;
     fn nmc_stop();
     fn nmc_run_loop_run();
@@ -158,6 +163,7 @@ pub(crate) fn start(
     system_callback: SystemEventCallback,
     signal_callback: SignalEventCallback,
     frontmost_bundle_callback: FrontmostBundleCallback,
+    monitor_frontmost_bundle: bool,
 ) -> bool {
     unsafe {
         nmc_start(
@@ -166,7 +172,17 @@ pub(crate) fn start(
             system_callback,
             signal_callback,
             frontmost_bundle_callback,
+            monitor_frontmost_bundle,
         )
+    }
+}
+
+pub(crate) fn set_frontmost_bundle_monitor_enabled(
+    frontmost_bundle_callback: FrontmostBundleCallback,
+    enabled: bool,
+) {
+    unsafe {
+        nmc_set_frontmost_bundle_monitor_enabled(frontmost_bundle_callback, enabled);
     }
 }
 

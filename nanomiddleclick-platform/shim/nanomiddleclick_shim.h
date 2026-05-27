@@ -61,6 +61,9 @@ void NMCStartWorkspaceMonitor(
     NMCSystemEventCallback system_callback,
     NMCFrontmostBundleCallback frontmost_bundle_callback
 );
+void NMCSetFrontmostBundleMonitorEnabled(
+    NMCFrontmostBundleCallback frontmost_bundle_callback
+);
 void NMCStopWorkspaceMonitor(void);
 
 #endif
