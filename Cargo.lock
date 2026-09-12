@@ -82,9 +82,9 @@ checksum = "b9e0384b61958566e926dc50660321d12159025e767c18e043daf26b70104c39"
 
 [[package]]
 name = "lunchd"
-version = "0.1.1"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d41ac4d231aeaadac7ee22563aa0216eb5506d79a64427f4fbc7f777ed55a1f0"
+checksum = "3ef835139d1becd2ae385d9a7e244e8fd3096af65bfa40a529878624599af510"
 dependencies = [
  "derive_builder",
  "thiserror",
