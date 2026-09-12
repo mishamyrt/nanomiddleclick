@@ -1,6 +1,6 @@
 .PHONY: build lint test publish
 
-VERSION := 0.1.0
+VERSION := 0.1.1
 
 all: build
 

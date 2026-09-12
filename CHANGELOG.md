@@ -2,6 +2,36 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.1](https://github.com/mishamyrt/nanomiddleclick/compare/v0.1.0..v0.1.1) - 2026-09-12
+
+### 🐛 Bug Fixes
+
+- Avoid possible leak on config change
+
+### 🚜 Refactor
+
+- Improve default mouse mode fallback
+- Improve config memory managment
+- Remove extra lines from launch agent
+- Migrate to lunchd
+- Split shim
+- Split platform crate
+- Simplify platform code
+
+### 📚 Documentation
+
+- Add version badge
+- Add contributing guide
+- Add code of conduct
+- Add security policy
+- Add issue templates
+- Add pr template
+- Update logo
+
+### ⚡ Performance
+
+- Start app monitor only if list is not empty
+
 ## [0.1.0](https://github.com/mishamyrt/nanomiddleclick/compare/..v0.1.0) - 2026-04-18
 
 ### 🚀 Features
