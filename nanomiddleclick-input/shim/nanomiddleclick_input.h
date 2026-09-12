@@ -9,7 +9,7 @@
 typedef void (*NMCTouchCallback)(const MTTouch *touches, uintptr_t touchCount, double timestamp, int32_t frame, uint32_t source_kind);
 typedef uint32_t (*NMCMouseEventCallback)(uint32_t kind);
 typedef void (*NMCSystemEventCallback)(uint32_t kind);
-typedef void (*NMCSignalEventCallback)(uint32_t kind);
+typedef void (*NMCReloadCallback)(void);
 
 typedef uint32_t NMCMouseEventKind;
 enum {
@@ -30,11 +30,6 @@ typedef uint32_t NMCSystemEventKind;
 enum {
     NMCSystemEventKindDeviceAdded = 1,
     NMCSystemEventKindDisplayReconfigured = 2,
-};
-
-typedef uint32_t NMCSignalKind;
-enum {
-    NMCSignalKindReload = 1,
 };
 
 typedef uint32_t NMCTouchDeviceKind;

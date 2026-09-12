@@ -70,29 +70,13 @@ NMCPStringArray nmcp_copy_string_array(const char *domain, const char *key) {
         return result;
     }
 
-    const void **set_values = NULL;
-    CFTypeID type = CFGetTypeID(raw_value);
-    CFIndex count = 0;
-
-    if (type == CFArrayGetTypeID()) {
-        count = CFArrayGetCount((CFArrayRef)raw_value);
-    } else if (type == CFSetGetTypeID()) {
-        count = CFSetGetCount((CFSetRef)raw_value);
-        if (count > 0) {
-            set_values = calloc((size_t)count, sizeof(*set_values));
-            if (set_values == NULL) {
-                CFRelease(raw_value);
-                return result;
-            }
-            CFSetGetValues((CFSetRef)raw_value, set_values);
-        }
-    } else {
+    if (CFGetTypeID(raw_value) != CFArrayGetTypeID()) {
         CFRelease(raw_value);
         return result;
     }
 
+    CFIndex count = CFArrayGetCount((CFArrayRef)raw_value);
     if (count <= 0) {
-        free(set_values);
         CFRelease(raw_value);
         return result;
     }
@@ -101,15 +85,12 @@ NMCPStringArray nmcp_copy_string_array(const char *domain, const char *key) {
     result.values = calloc((size_t)count, sizeof(char *));
     if (result.values == NULL) {
         result.len = 0;
-        free(set_values);
         CFRelease(raw_value);
         return result;
     }
 
     for (CFIndex index = 0; index < count; index += 1) {
-        CFTypeRef entry = type == CFArrayGetTypeID()
-            ? CFArrayGetValueAtIndex((CFArrayRef)raw_value, index)
-            : set_values[index];
+        CFTypeRef entry = CFArrayGetValueAtIndex((CFArrayRef)raw_value, index);
         if (entry == NULL || CFGetTypeID(entry) != CFStringGetTypeID()) {
             continue;
         }
@@ -117,7 +98,6 @@ NMCPStringArray nmcp_copy_string_array(const char *domain, const char *key) {
         result.values[index] = NMCPCopyUTF8String((CFStringRef)entry);
     }
 
-    free(set_values);
     CFRelease(raw_value);
     return result;
 }

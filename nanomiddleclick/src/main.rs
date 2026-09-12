@@ -9,7 +9,6 @@ use std::sync::Arc;
 
 use app::App;
 use launchd::build_agent_config;
-use nanomiddleclick_core::Config;
 
 use crate::launchd::LaunchAgentError;
 
@@ -63,19 +62,16 @@ fn run_launchctl_action(
 }
 
 fn run_daemon() {
-    let config = match settings::load_config() {
-        Ok(config) => config,
-        Err(error) => {
-            log_error!("failed to load config: {error}");
-            Config::fallback(nanomiddleclick_preferences::system_tap_to_click())
-        }
-    };
+    let config = settings::load_config();
 
-    log_info!("starting nanomiddleclick with domain {}", settings::DEFAULTS_DOMAIN);
+    log_info!(
+        "starting nanomiddleclick with domain {}",
+        settings::DEFAULTS_DOMAIN.to_string_lossy()
+    );
     log_info!("config: {config}");
     let monitor_frontmost_bundle = !config.ignored_app_bundles.is_empty();
 
-    if !nanomiddleclick_input::is_accessibility_trusted(false) {
+    if !nanomiddleclick_input::is_accessibility_trusted() {
         log_warn!(
             "Accessibility permission is not granted; click rewriting may stay inactive until permission is granted and listeners are reloaded"
         );

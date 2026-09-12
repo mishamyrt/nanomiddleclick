@@ -91,11 +91,6 @@ impl GestureEngine {
         self.latest_centroid = None;
     }
 
-    pub fn reset_for_ignored_app(&mut self) {
-        self.cancel_current_touch_sequence();
-        self.rewritten_mouse_down_active = false;
-    }
-
     pub fn handle_touch_frame<I, T>(
         &mut self,
         source_kind: TouchDeviceKind,

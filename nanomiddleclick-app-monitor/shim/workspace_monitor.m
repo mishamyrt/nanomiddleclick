@@ -2,7 +2,7 @@
 
 #import "nanomiddleclick_app_monitor.h"
 
-static NMCAppMonitorEventCallback g_event_callback = NULL;
+static NMCWakeCallback g_wake_callback = NULL;
 static NMCFrontmostBundleCallback g_frontmost_bundle_callback = NULL;
 static id g_wake_observer = nil;
 static id g_activation_observer = nil;
@@ -14,10 +14,10 @@ static void NMCStopActivationObserver(void);
 static void NMCNotifyFrontmostBundle(void);
 
 void NMCStartWorkspaceMonitor(
-    NMCAppMonitorEventCallback event_callback,
+    NMCWakeCallback wake_callback,
     NMCFrontmostBundleCallback frontmost_bundle_callback
 ) {
-    g_event_callback = event_callback;
+    g_wake_callback = wake_callback;
 
     NMCStartWakeObserver();
     NMCSetFrontmostBundleMonitorEnabled(frontmost_bundle_callback);
@@ -38,7 +38,7 @@ void NMCSetFrontmostBundleMonitorEnabled(
 void NMCStopWorkspaceMonitor(void) {
     NMCStopWakeObserver();
     NMCStopActivationObserver();
-    g_event_callback = NULL;
+    g_wake_callback = NULL;
     g_frontmost_bundle_callback = NULL;
 }
 
@@ -52,8 +52,8 @@ static void NMCStartWakeObserver(void) {
         object:nil
         queue:nil
         usingBlock:^(__unused NSNotification *note) {
-            if (g_event_callback != NULL) {
-                g_event_callback(NMCAppMonitorEventKindWake);
+            if (g_wake_callback != NULL) {
+                g_wake_callback();
             }
         }];
 }

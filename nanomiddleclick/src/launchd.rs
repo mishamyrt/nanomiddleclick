@@ -18,7 +18,7 @@ pub(crate) enum LaunchAgentError {
 
 pub(crate) fn build_agent_config() -> Result<LaunchAgent, LaunchAgentError> {
     let executable_path = env::current_exe()?;
-    LaunchAgent::builder(DEFAULTS_DOMAIN)
+    LaunchAgent::builder(&DEFAULTS_DOMAIN.to_string_lossy())
         .arg(executable_path.to_string_lossy())
         .run_at_load(true)
         .stdout_path("/tmp/nanomiddleclick.stdout.log")

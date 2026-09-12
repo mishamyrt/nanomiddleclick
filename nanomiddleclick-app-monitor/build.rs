@@ -1,5 +1,5 @@
 use std::env;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::Command;
 
 fn main() {
@@ -37,32 +37,10 @@ fn main() {
 }
 
 fn run(command: &mut Command) {
-    let rendered = render_command(command);
+    let rendered = format!("{command:?}");
     let status = command
         .status()
         .unwrap_or_else(|error| panic!("failed to run `{rendered}`: {error}"));
 
     assert!(status.success(), "command `{rendered}` exited with status {status}");
-}
-
-fn render_command(command: &Command) -> String {
-    let mut rendered = command.get_program().to_string_lossy().into_owned();
-
-    for argument in command.get_args() {
-        rendered.push(' ');
-        rendered.push_str(&shell_escape(argument.as_ref()));
-    }
-
-    rendered
-}
-
-fn shell_escape(argument: &Path) -> String {
-    let rendered = argument.to_string_lossy();
-    if rendered.chars().all(|character| {
-        character.is_ascii_alphanumeric() || "/._-".contains(character)
-    }) {
-        rendered.into_owned()
-    } else {
-        format!("{rendered:?}")
-    }
 }

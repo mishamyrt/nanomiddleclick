@@ -2,7 +2,6 @@ use std::fmt;
 use std::time::Duration;
 
 const DEFAULT_FINGERS: usize = 3;
-const DEFAULT_ALLOW_MORE_FINGERS: bool = false;
 const DEFAULT_MAX_DISTANCE_DELTA: f64 = 0.05;
 const DEFAULT_MAX_TIME_DELTA_MS: u64 = 300;
 
@@ -84,18 +83,6 @@ impl Config {
             tap_to_click,
             mouse_click_mode: MouseClickMode::from_raw(mouse_click_mode),
             ignored_app_bundles,
-        }
-    }
-
-    pub fn fallback(system_tap_to_click: bool) -> Self {
-        Self {
-            fingers: DEFAULT_FINGERS,
-            allow_more_fingers: DEFAULT_ALLOW_MORE_FINGERS,
-            max_distance_delta: DEFAULT_MAX_DISTANCE_DELTA,
-            max_time_delta: Duration::from_millis(DEFAULT_MAX_TIME_DELTA_MS),
-            tap_to_click: system_tap_to_click,
-            mouse_click_mode: MouseClickMode::default(),
-            ignored_app_bundles: Vec::new().into_boxed_slice(),
         }
     }
 

@@ -5,23 +5,8 @@ use std::sync::{Arc, OnceLock};
 
 static HANDLER: OnceLock<Arc<dyn EventHandler>> = OnceLock::new();
 
-#[repr(u32)]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum EventKind {
-    Wake = 1,
-}
-
-impl EventKind {
-    fn from_raw(raw: u32) -> Option<Self> {
-        match raw {
-            1 => Some(Self::Wake),
-            _ => None,
-        }
-    }
-}
-
 pub trait EventHandler: Send + Sync {
-    fn handle_app_monitor_event(&self, kind: EventKind);
+    fn handle_wake(&self);
     fn handle_frontmost_bundle_change(&self, bundle_id: Option<&str>);
 }
 
@@ -33,7 +18,7 @@ pub fn install_event_handler(
 
 pub fn start(monitor_frontmost_bundle: bool) {
     raw::start(
-        event_callback,
+        wake_callback,
         monitor_frontmost_bundle.then_some(frontmost_bundle_callback),
     );
 }
@@ -48,13 +33,9 @@ pub fn stop() {
     raw::stop();
 }
 
-extern "C" fn event_callback(kind: u32) {
-    let Some(kind) = EventKind::from_raw(kind) else {
-        return;
-    };
-
+extern "C" fn wake_callback() {
     if let Some(handler) = handler() {
-        handler.handle_app_monitor_event(kind);
+        handler.handle_wake();
     }
 }
 

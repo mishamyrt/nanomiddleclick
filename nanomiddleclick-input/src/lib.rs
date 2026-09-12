@@ -10,16 +10,6 @@ pub trait TouchSource {
     fn normalized_position(&self) -> (f32, f32);
 }
 
-impl<T: TouchSource + ?Sized> TouchSource for &T {
-    fn is_touching(&self) -> bool {
-        (*self).is_touching()
-    }
-
-    fn normalized_position(&self) -> (f32, f32) {
-        (*self).normalized_position()
-    }
-}
-
 #[derive(Clone, Copy, Debug)]
 pub struct TouchFrame<'a> {
     raw: &'a [raw::RawTouch],
@@ -108,11 +98,6 @@ impl MouseAction {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum MouseButton {
-    Middle,
-}
-
 #[repr(u32)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SystemEventKind {
@@ -130,26 +115,11 @@ impl SystemEventKind {
     }
 }
 
-#[repr(u32)]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum SignalKind {
-    Reload = 1,
-}
-
-impl SignalKind {
-    fn from_raw(raw: u32) -> Option<Self> {
-        match raw {
-            1 => Some(Self::Reload),
-            _ => None,
-        }
-    }
-}
-
 pub trait EventHandler: Send + Sync {
     fn handle_touch_frame(&self, touches: TouchFrame<'_>);
     fn handle_mouse_event(&self, kind: MouseEventKind) -> MouseAction;
     fn handle_system_event(&self, kind: SystemEventKind);
-    fn handle_signal(&self, kind: SignalKind);
+    fn handle_reload(&self);
 }
 
 pub fn install_event_handler(
@@ -158,8 +128,8 @@ pub fn install_event_handler(
     HANDLER.set(handler).map_err(|_| "event handler already installed")
 }
 
-pub fn is_accessibility_trusted(prompt: bool) -> bool {
-    raw::is_accessibility_trusted(prompt)
+pub fn is_accessibility_trusted() -> bool {
+    raw::is_accessibility_trusted()
 }
 
 pub fn start() -> bool {
@@ -167,7 +137,7 @@ pub fn start() -> bool {
         touch_frame_callback,
         mouse_event_callback,
         system_event_callback,
-        signal_callback,
+        reload_callback,
     )
 }
 
@@ -183,10 +153,8 @@ pub fn run_loop_run() {
     raw::run_loop_run();
 }
 
-pub fn post_mouse_click(button: MouseButton) {
-    match button {
-        MouseButton::Middle => raw::post_middle_mouse_click(),
-    }
+pub fn post_middle_mouse_click() {
+    raw::post_middle_mouse_click();
 }
 
 extern "C" fn touch_frame_callback(
@@ -234,13 +202,9 @@ extern "C" fn system_event_callback(kind: u32) {
     }
 }
 
-extern "C" fn signal_callback(kind: u32) {
-    let Some(kind) = SignalKind::from_raw(kind) else {
-        return;
-    };
-
+extern "C" fn reload_callback() {
     if let Some(handler) = handler() {
-        handler.handle_signal(kind);
+        handler.handle_reload();
     }
 }
 

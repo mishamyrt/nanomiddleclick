@@ -42,16 +42,16 @@ pub type TouchFrameCallback = extern "C" fn(
 );
 pub type MouseEventCallback = extern "C" fn(kind: u32) -> u32;
 pub type SystemEventCallback = extern "C" fn(kind: u32);
-pub type SignalEventCallback = extern "C" fn(kind: u32);
+pub type ReloadCallback = extern "C" fn();
 
 #[link(name = "nanomiddleclick_input_shim", kind = "static")]
 unsafe extern "C" {
-    fn nmc_is_accessibility_trusted(prompt: bool) -> bool;
+    fn nmc_is_accessibility_trusted() -> bool;
     fn nmc_start(
         touch_callback: TouchFrameCallback,
         mouse_callback: MouseEventCallback,
         system_callback: SystemEventCallback,
-        signal_callback: SignalEventCallback,
+        reload_callback: ReloadCallback,
     ) -> bool;
     fn nmc_restart_listeners() -> bool;
     fn nmc_stop();
@@ -59,18 +59,18 @@ unsafe extern "C" {
     fn nmc_post_middle_mouse_click();
 }
 
-pub(crate) fn is_accessibility_trusted(prompt: bool) -> bool {
-    unsafe { nmc_is_accessibility_trusted(prompt) }
+pub(crate) fn is_accessibility_trusted() -> bool {
+    unsafe { nmc_is_accessibility_trusted() }
 }
 
 pub(crate) fn start(
     touch_callback: TouchFrameCallback,
     mouse_callback: MouseEventCallback,
     system_callback: SystemEventCallback,
-    signal_callback: SignalEventCallback,
+    reload_callback: ReloadCallback,
 ) -> bool {
     unsafe {
-        nmc_start(touch_callback, mouse_callback, system_callback, signal_callback)
+        nmc_start(touch_callback, mouse_callback, system_callback, reload_callback)
     }
 }
 

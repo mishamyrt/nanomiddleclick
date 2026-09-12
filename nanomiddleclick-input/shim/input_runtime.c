@@ -17,7 +17,7 @@ typedef struct {
 static NMCTouchCallback g_touch_callback = NULL;
 static NMCMouseEventCallback g_mouse_event_callback = NULL;
 static NMCSystemEventCallback g_system_event_callback = NULL;
-static NMCSignalEventCallback g_signal_event_callback = NULL;
+static NMCReloadCallback g_reload_callback = NULL;
 
 static NMCTouchDeviceEntry *g_touch_devices = NULL;
 static size_t g_touch_device_count = 0;
@@ -176,24 +176,8 @@ static void NMCDisplayReconfigurationCallback(CGDirectDisplayID display, CGDispl
     }
 }
 
-bool nmc_is_accessibility_trusted(bool prompt) {
-    const void *keys[] = { kAXTrustedCheckOptionPrompt };
-    const void *values[] = { prompt ? kCFBooleanTrue : kCFBooleanFalse };
-    CFDictionaryRef options = CFDictionaryCreate(
-        kCFAllocatorDefault,
-        keys,
-        values,
-        1,
-        &kCFTypeDictionaryKeyCallBacks,
-        &kCFTypeDictionaryValueCallBacks
-    );
-    if (options == NULL) {
-        return AXIsProcessTrustedWithOptions(NULL);
-    }
-
-    const bool trusted = AXIsProcessTrustedWithOptions(options);
-    CFRelease(options);
-    return trusted;
+bool nmc_is_accessibility_trusted(void) {
+    return AXIsProcessTrusted();
 }
 
 bool nmc_restart_listeners(void);
@@ -202,12 +186,12 @@ bool nmc_start(
     NMCTouchCallback touch_callback,
     NMCMouseEventCallback mouse_callback,
     NMCSystemEventCallback system_callback,
-    NMCSignalEventCallback signal_callback
+    NMCReloadCallback reload_callback
 ) {
     g_touch_callback = touch_callback;
     g_mouse_event_callback = mouse_callback;
     g_system_event_callback = system_callback;
-    g_signal_event_callback = signal_callback;
+    g_reload_callback = reload_callback;
     g_run_loop = CFRunLoopGetCurrent();
 
     NMCStartDeviceMonitor();
@@ -500,8 +484,8 @@ static void NMCStopSignalMonitor(void) {
 static void NMCHandleReloadSignal(void *context) {
     (void)context;
 
-    if (g_signal_event_callback != NULL) {
-        g_signal_event_callback(NMCSignalKindReload);
+    if (g_reload_callback != NULL) {
+        g_reload_callback();
     }
 }
 

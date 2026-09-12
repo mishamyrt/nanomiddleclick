@@ -1,18 +1,11 @@
 #ifndef NANOMIDDLECLICK_APP_MONITOR_H
 #define NANOMIDDLECLICK_APP_MONITOR_H
 
-#include <stdint.h>
-
-typedef void (*NMCAppMonitorEventCallback)(uint32_t kind);
+typedef void (*NMCWakeCallback)(void);
 typedef void (*NMCFrontmostBundleCallback)(const char *bundleID);
 
-typedef uint32_t NMCAppMonitorEventKind;
-enum {
-    NMCAppMonitorEventKindWake = 1,
-};
-
 void NMCStartWorkspaceMonitor(
-    NMCAppMonitorEventCallback event_callback,
+    NMCWakeCallback wake_callback,
     NMCFrontmostBundleCallback frontmost_bundle_callback
 );
 void NMCSetFrontmostBundleMonitorEnabled(
