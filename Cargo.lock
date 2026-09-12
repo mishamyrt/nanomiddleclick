@@ -98,7 +98,7 @@ dependencies = [
  "nanomiddleclick-app-monitor",
  "nanomiddleclick-core",
  "nanomiddleclick-input",
- "nanomiddleclick-preferences",
+ "prefs",
  "thiserror",
 ]
 
@@ -118,8 +118,13 @@ name = "nanomiddleclick-input"
 version = "0.1.0"
 
 [[package]]
-name = "nanomiddleclick-preferences"
-version = "0.1.0"
+name = "prefs"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e0d7aa3c94d4a23fee4c1b7fb579dc8d8ed00bc1d174e655c5bada87c0d8b08f"
+dependencies = [
+ "thiserror",
+]
 
 [[package]]
 name = "proc-macro2"

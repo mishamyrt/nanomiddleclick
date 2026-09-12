@@ -67,6 +67,8 @@ The daemon reads settings from `co.myrt.nanomiddleclick`. After changing the con
 kill -HUP "$(pgrep -x nanomiddleclick)"
 ```
 
+Use the value types shown in the examples below. Missing keys use their defaults, but malformed values for `maxDistanceDelta` and `tapToClick` are read as `0` and `false`, respectively.
+
 ### Number of Fingers
 
 You can use any number of fingers (up to 10) to middle-click.

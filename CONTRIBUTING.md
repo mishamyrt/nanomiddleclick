@@ -21,7 +21,7 @@ rustup component add rustfmt clippy
 - `nanomiddleclick` contains the CLI and daemon application.
 - `nanomiddleclick-core` contains configuration and gesture orchestration.
 - `nanomiddleclick-input` contains macOS input runtime code and the native multitouch/event-tap shim.
-- `nanomiddleclick-preferences` contains generic macOS preferences access.
+- macOS preferences access uses the [`prefs`](https://github.com/mishamyrt/prefs) crate.
 - `nanomiddleclick-app-monitor` contains generic macOS workspace/frontmost-app monitoring.
 - `.github/workflows/qa.yml` defines the checks that run in CI.
 

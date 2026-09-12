@@ -64,10 +64,7 @@ fn run_launchctl_action(
 fn run_daemon() {
     let config = settings::load_config();
 
-    log_info!(
-        "starting nanomiddleclick with domain {}",
-        settings::DEFAULTS_DOMAIN.to_string_lossy()
-    );
+    log_info!("starting nanomiddleclick with domain {}", settings::DEFAULTS_DOMAIN);
     log_info!("config: {config}");
     let monitor_frontmost_bundle = !config.ignored_app_bundles.is_empty();
 
