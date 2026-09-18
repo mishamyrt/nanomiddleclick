@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.2](https://github.com/mishamyrt/nanomiddleclick/compare/v0.1.1..v0.1.2) - 2026-09-18
+
+### 🐛 Bug Fixes
+
+- Avoid double release
+
 ## [0.1.1](https://github.com/mishamyrt/nanomiddleclick/compare/v0.1.0..v0.1.1) - 2026-09-12
 
 ### 🐛 Bug Fixes

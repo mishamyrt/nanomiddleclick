@@ -92,7 +92,7 @@ dependencies = [
 
 [[package]]
 name = "nanomiddleclick"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "lunchd",
  "nanomiddleclick-app-monitor",
@@ -104,18 +104,18 @@ dependencies = [
 
 [[package]]
 name = "nanomiddleclick-app-monitor"
-version = "0.1.1"
+version = "0.1.2"
 
 [[package]]
 name = "nanomiddleclick-core"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "nanomiddleclick-input",
 ]
 
 [[package]]
 name = "nanomiddleclick-input"
-version = "0.1.1"
+version = "0.1.2"
 
 [[package]]
 name = "prefs"
