@@ -70,7 +70,7 @@ Before opening a pull request, run:
 ```sh
 cargo fmt --all --check
 cargo clippy --workspace --all-targets --all-features -- -D warnings
-cargo test --workspace --all-features
+make test
 ```
 
 For changes that affect input handling, configuration, daemon startup, or launchd integration, also test the installed daemon manually on macOS. Include the scenario you tested in the pull request description.

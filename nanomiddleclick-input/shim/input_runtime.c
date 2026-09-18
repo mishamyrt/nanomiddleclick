@@ -33,7 +33,6 @@ static dispatch_source_t g_int_signal_source = NULL;
 static bool g_display_callback_registered = false;
 
 static void NMCDrainIterator(io_iterator_t iterator);
-static void NMCReleaseTouchDeviceList(CFArrayRef list);
 static void NMCStopTouchDevices(void);
 static void NMCStartTouchDevices(void);
 static void NMCStopEventTap(void);
@@ -250,20 +249,6 @@ static void NMCDrainIterator(io_iterator_t iterator) {
     }
 }
 
-static void NMCReleaseTouchDeviceList(CFArrayRef list) {
-    if (list == NULL) {
-        return;
-    }
-
-    const CFIndex count = CFArrayGetCount(list);
-    for (CFIndex index = 0; index < count; index += 1) {
-        MTDeviceRef device = (MTDeviceRef)CFArrayGetValueAtIndex(list, index);
-        if (device != NULL) {
-            MTDeviceRelease(device);
-        }
-    }
-}
-
 static void NMCStopTouchDevices(void) {
     for (size_t index = 0; index < g_touch_device_count; index += 1) {
         MTDeviceRef ref = g_touch_devices[index].device;
@@ -295,7 +280,6 @@ static void NMCStartTouchDevices(void) {
 
     g_touch_devices = calloc((size_t)count, sizeof(*g_touch_devices));
     if (g_touch_devices == NULL) {
-        NMCReleaseTouchDeviceList(list);
         CFRelease(list);
         return;
     }
@@ -303,6 +287,8 @@ static void NMCStartTouchDevices(void) {
     for (CFIndex index = 0; index < count; index += 1) {
         MTDeviceRef ref = (MTDeviceRef)CFArrayGetValueAtIndex(list, index);
         const NMCTouchDeviceKind kind = NMCClassifyTouchDevice(ref);
+        // Keep the device alive after releasing the list, until NMCStopTouchDevices.
+        CFRetain(ref);
         g_touch_devices[g_touch_device_count++] = (NMCTouchDeviceEntry){
             .device = ref,
             .kind = kind,

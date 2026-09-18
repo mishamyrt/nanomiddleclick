@@ -1,7 +1,7 @@
 use std::env;
 
 use crate::settings::DEFAULTS_DOMAIN;
-use lunchd::LaunchAgent;
+use lunchd::{KeepAlive, LaunchAgent};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -21,6 +21,7 @@ pub(crate) fn build_agent_config() -> Result<LaunchAgent, LaunchAgentError> {
     LaunchAgent::builder(DEFAULTS_DOMAIN)
         .arg(executable_path.to_string_lossy())
         .run_at_load(true)
+        .keep_alive(KeepAlive::Crashed)
         .stdout_path("/tmp/nanomiddleclick.stdout.log")
         .stderr_path("/tmp/nanomiddleclick.stderr.log")
         .build()

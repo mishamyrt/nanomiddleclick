@@ -59,6 +59,8 @@ Once the app is installed, you need to start the background process. To do this,
 nanomiddleclick daemon on
 ```
 
+The daemon restarts automatically if it crashes. After upgrading, run `nanomiddleclick daemon on` again to restart it and update its launchd configuration.
+
 ## Configuration
 
 The daemon reads settings from `co.myrt.nanomiddleclick`. After changing the configuration, you must restart the daemon:

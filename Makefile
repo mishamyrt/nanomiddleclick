@@ -1,4 +1,4 @@
-.PHONY: build lint test publish
+.PHONY: build lint test test-input publish
 
 VERSION := 0.1.1
 
@@ -10,8 +10,16 @@ build:
 lint:
 	cargo clippy --workspace --all-targets --all-features -- -D warnings
 
-test:
-	cargo test --all-features
+test: test-input
+	cargo test --workspace --all-features
+
+test-input:
+	@mkdir -p target
+	xcrun clang -Wall -Wextra -Werror -fsanitize=address \
+		nanomiddleclick-input/tests/device_lifetime.c \
+		-framework ApplicationServices -framework CoreFoundation -framework IOKit \
+		-o target/device_lifetime_test
+	./target/device_lifetime_test
 
 install:
 	cargo install --path nanomiddleclick

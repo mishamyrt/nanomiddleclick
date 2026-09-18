@@ -18,7 +18,7 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
 
       - name: Run tests
-        run: cargo test --workspace --all-features
+        run: make test
 
   code-style:
     name: Code style check
