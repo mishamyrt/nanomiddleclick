@@ -17,6 +17,7 @@ enum {
     NMCMouseEventKindLeftUp = 2,
     NMCMouseEventKindRightDown = 3,
     NMCMouseEventKindRightUp = 4,
+    NMCMouseEventKindMoved = 5,
 };
 
 typedef uint32_t NMCMouseAction;
@@ -24,6 +25,8 @@ enum {
     NMCMouseActionPass = 0,
     NMCMouseActionRewriteDown = 1,
     NMCMouseActionRewriteUp = 2,
+    NMCMouseActionRewriteDrag = 3,
+    NMCMouseActionSuppress = 4,
 };
 
 typedef uint32_t NMCSystemEventKind;

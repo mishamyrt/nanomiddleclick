@@ -93,6 +93,8 @@ defaults write co.myrt.nanomiddleclick allowMoreFingers -bool true
 
 ### Tapping tuning
 
+These limits apply to taps.
+
 The default values for these settings should work for most users, but if they aren't working correctly for you, you should start by adjusting them.
 
 #### Max Distance Delta
@@ -133,6 +135,22 @@ By default, it follows the system behavior for 1 and 2 fingers, but you can set 
 ```sh
 defaults write co.myrt.nanomiddleclick tapToClick -bool true
 ```
+
+### Middle-button dragging
+
+Place three fingers on the trackpad to hold the middle button; move them to pan a canvas and lift a finger to release. Uses `fingers` and `allowMoreFingers`, independently of `tapToClick`. Three-finger click-and-drag is also supported. Disabled by default.
+
+```sh
+defaults write co.myrt.nanomiddleclick drag -bool true
+```
+
+For touch dragging, `dragSensitivity` sets pointer speed in screen points per normalized unit (default `1000`, range `1`–`10000`).
+
+```sh
+defaults write co.myrt.nanomiddleclick dragSensitivity -float 1000
+```
+
+Disable conflicting three-finger gestures in macOS settings.
 
 ### Magic Mouse mode
 

@@ -44,17 +44,22 @@ pub struct Config {
     pub max_distance_delta: f64,
     pub max_time_delta: Duration,
     pub tap_to_click: bool,
+    pub drag: bool,
+    pub drag_sensitivity: f64,
     pub mouse_click_mode: MouseClickMode,
     pub ignored_app_bundles: Box<[Box<str>]>,
 }
 
 impl Config {
+    #[allow(clippy::too_many_arguments)]
     pub fn from_raw_parts(
         fingers: i64,
         allow_more_fingers: bool,
         max_distance_delta: f64,
         max_time_delta_ms: i64,
         tap_to_click: bool,
+        drag: bool,
+        drag_sensitivity: f64,
         mouse_click_mode: u32,
         ignored_app_bundles: Box<[Box<str>]>,
     ) -> Self {
@@ -81,6 +86,14 @@ impl Config {
             max_distance_delta,
             max_time_delta: Duration::from_millis(max_time_delta_ms),
             tap_to_click,
+            drag,
+            drag_sensitivity: if drag_sensitivity.is_finite()
+                && (1.0..=10_000.0).contains(&drag_sensitivity)
+            {
+                drag_sensitivity
+            } else {
+                1000.0
+            },
             mouse_click_mode: MouseClickMode::from_raw(mouse_click_mode),
             ignored_app_bundles,
         }
@@ -88,12 +101,14 @@ impl Config {
 
     pub fn describe(&self) -> String {
         format!(
-            "fingers={}, allowMoreFingers={}, maxDistanceDelta={:.4}, maxTimeDeltaMs={}, tapToClick={}, mouseClickMode={}, ignoredAppBundles={}",
+            "fingers={}, allowMoreFingers={}, maxDistanceDelta={:.4}, maxTimeDeltaMs={}, tapToClick={}, drag={}, dragSensitivity={}, mouseClickMode={}, ignoredAppBundles={}",
             self.fingers,
             self.allow_more_fingers,
             self.max_distance_delta,
             self.max_time_delta.as_millis(),
             self.tap_to_click,
+            self.drag,
+            self.drag_sensitivity,
             self.mouse_click_mode.as_str(),
             self.ignored_app_bundles.len(),
         )

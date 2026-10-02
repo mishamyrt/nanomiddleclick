@@ -2,6 +2,8 @@
 #include <CoreFoundation/CoreFoundation.h>
 #include <IOKit/IOKitLib.h>
 #include <dispatch/dispatch.h>
+#include <math.h>
+#include <pthread.h>
 #include <signal.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -31,6 +33,13 @@ static dispatch_source_t g_reload_signal_source = NULL;
 static dispatch_source_t g_term_signal_source = NULL;
 static dispatch_source_t g_int_signal_source = NULL;
 static bool g_display_callback_registered = false;
+
+// ponytail: one drag at a time; use per-device state if simultaneous drags are needed.
+static pthread_mutex_t g_mouse_mutex = PTHREAD_MUTEX_INITIALIZER;
+static bool g_middle_mouse_down = false;
+static CGPoint g_middle_mouse_location;
+
+void nmc_post_middle_mouse_event(uint32_t action, double delta_x, double delta_y);
 
 static void NMCDrainIterator(io_iterator_t iterator);
 static void NMCStopTouchDevices(void);
@@ -77,18 +86,35 @@ static CGEventRef NMCMouseTapCallback(CGEventTapProxy proxy, CGEventType type, C
         case kCGEventRightMouseUp:
             kind = NMCMouseEventKindRightUp;
             break;
+        case kCGEventLeftMouseDragged:
+        case kCGEventRightMouseDragged:
+        case kCGEventMouseMoved:
+            kind = NMCMouseEventKindMoved;
+            break;
         default:
             return event;
     }
 
     uint32_t action = g_mouse_event_callback(kind);
+    if (action == NMCMouseActionSuppress) {
+        return NULL;
+    }
+
+    pthread_mutex_lock(&g_mouse_mutex);
     if (action == NMCMouseActionRewriteDown) {
         CGEventSetType(event, kCGEventOtherMouseDown);
-        CGEventSetIntegerValueField(event, kCGMouseEventButtonNumber, (int64_t)kCGMouseButtonCenter);
+        g_middle_mouse_down = true;
     } else if (action == NMCMouseActionRewriteUp) {
         CGEventSetType(event, kCGEventOtherMouseUp);
-        CGEventSetIntegerValueField(event, kCGMouseEventButtonNumber, (int64_t)kCGMouseButtonCenter);
+        g_middle_mouse_down = false;
+    } else if (action == NMCMouseActionRewriteDrag) {
+        CGEventSetType(event, kCGEventOtherMouseDragged);
     }
+    if (action != NMCMouseActionPass) {
+        CGEventSetIntegerValueField(event, kCGMouseEventButtonNumber, (int64_t)kCGMouseButtonCenter);
+        g_middle_mouse_location = CGEventGetLocation(event);
+    }
+    pthread_mutex_unlock(&g_mouse_mutex);
 
     return event;
 }
@@ -209,6 +235,7 @@ bool nmc_restart_listeners(void) {
 
 void nmc_stop(void) {
     NMCStopTouchDevices();
+    nmc_post_middle_mouse_event(NMCMouseActionRewriteUp, 0, 0);
     NMCStopEventTap();
     NMCStopDeviceMonitor();
     NMCStopDisplayObserver();
@@ -220,26 +247,60 @@ void nmc_run_loop_run(void) {
     CFRunLoopRun();
 }
 
-void nmc_post_middle_mouse_click(void) {
+void nmc_post_middle_mouse_event(uint32_t action, double delta_x, double delta_y) {
+    if (!isfinite(delta_x) || !isfinite(delta_y) ||
+        fabs(delta_x) > INT32_MAX || fabs(delta_y) > INT32_MAX) {
+        return;
+    }
+
+    pthread_mutex_lock(&g_mouse_mutex);
+    CGEventType type;
+    if (action == NMCMouseActionRewriteDown && !g_middle_mouse_down) {
+        type = kCGEventOtherMouseDown;
+    } else if (action == NMCMouseActionRewriteDrag && g_middle_mouse_down) {
+        type = kCGEventOtherMouseDragged;
+    } else if (action == NMCMouseActionRewriteUp && g_middle_mouse_down) {
+        type = kCGEventOtherMouseUp;
+    } else {
+        pthread_mutex_unlock(&g_mouse_mutex);
+        return;
+    }
+
     CGEventRef source_event = CGEventCreate(NULL);
-    CGPoint location = CGPointZero;
-
-    if (source_event != NULL) {
-        location = CGEventGetLocation(source_event);
-        CFRelease(source_event);
+    if (source_event == NULL) {
+        pthread_mutex_unlock(&g_mouse_mutex);
+        return;
+    }
+    CGPoint location = type == kCGEventOtherMouseDown
+        ? CGEventGetLocation(source_event)
+        : g_middle_mouse_location;
+    if (type == kCGEventOtherMouseDragged) {
+        location.x += delta_x;
+        location.y += delta_y;
     }
 
-    CGEventRef down = CGEventCreateMouseEvent(NULL, kCGEventOtherMouseDown, location, kCGMouseButtonCenter);
-    CGEventRef up = CGEventCreateMouseEvent(NULL, kCGEventOtherMouseUp, location, kCGMouseButtonCenter);
-
-    if (down != NULL) {
-        CGEventPost(kCGHIDEventTap, down);
-        CFRelease(down);
+    CGEventRef event = CGEventCreateMouseEvent(NULL, type, location, kCGMouseButtonCenter);
+    if (event != NULL) {
+        if (type == kCGEventOtherMouseDragged && CGWarpMouseCursorPosition(location) != kCGErrorSuccess) {
+            CFRelease(event);
+            CFRelease(source_event);
+            pthread_mutex_unlock(&g_mouse_mutex);
+            return;
+        }
+        CGEventSetFlags(event, CGEventGetFlags(source_event));
+        CGEventSetIntegerValueField(event, kCGMouseEventClickState, 1);
+        // Accumulate subpixel movement for editors that use integer deltas.
+        CGEventSetIntegerValueField(event, kCGMouseEventDeltaX,
+            type == kCGEventOtherMouseDragged ? llround(location.x) - llround(g_middle_mouse_location.x) : 0);
+        CGEventSetIntegerValueField(event, kCGMouseEventDeltaY,
+            type == kCGEventOtherMouseDragged ? llround(location.y) - llround(g_middle_mouse_location.y) : 0);
+        g_middle_mouse_down = type != kCGEventOtherMouseUp;
+        g_middle_mouse_location = location;
+        CGEventPost(kCGHIDEventTap, event);
+        CFRelease(event);
     }
-    if (up != NULL) {
-        CGEventPost(kCGHIDEventTap, up);
-        CFRelease(up);
-    }
+    CFRelease(source_event);
+    pthread_mutex_unlock(&g_mouse_mutex);
 }
 
 static void NMCDrainIterator(io_iterator_t iterator) {
@@ -323,7 +384,10 @@ static bool NMCStartEventTap(void) {
         CGEventMaskBit(kCGEventLeftMouseDown) |
         CGEventMaskBit(kCGEventLeftMouseUp) |
         CGEventMaskBit(kCGEventRightMouseDown) |
-        CGEventMaskBit(kCGEventRightMouseUp);
+        CGEventMaskBit(kCGEventRightMouseUp) |
+        CGEventMaskBit(kCGEventLeftMouseDragged) |
+        CGEventMaskBit(kCGEventRightMouseDragged) |
+        CGEventMaskBit(kCGEventMouseMoved);
 
     g_event_tap = CGEventTapCreate(
         kCGHIDEventTap,

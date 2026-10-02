@@ -70,6 +70,7 @@ pub enum MouseEventKind {
     LeftUp = 2,
     RightDown = 3,
     RightUp = 4,
+    Moved = 5,
 }
 
 impl MouseEventKind {
@@ -79,6 +80,7 @@ impl MouseEventKind {
             2 => Some(Self::LeftUp),
             3 => Some(Self::RightDown),
             4 => Some(Self::RightUp),
+            5 => Some(Self::Moved),
             _ => None,
         }
     }
@@ -90,6 +92,8 @@ pub enum MouseAction {
     Pass = 0,
     RewriteDown = 1,
     RewriteUp = 2,
+    RewriteDrag = 3,
+    Suppress = 4,
 }
 
 impl MouseAction {
@@ -154,7 +158,12 @@ pub fn run_loop_run() {
 }
 
 pub fn post_middle_mouse_click() {
-    raw::post_middle_mouse_click();
+    post_middle_mouse_event(MouseAction::RewriteDown, 0.0, 0.0);
+    post_middle_mouse_event(MouseAction::RewriteUp, 0.0, 0.0);
+}
+
+pub fn post_middle_mouse_event(action: MouseAction, delta_x: f64, delta_y: f64) {
+    raw::post_middle_mouse_event(action, delta_x, delta_y);
 }
 
 extern "C" fn touch_frame_callback(

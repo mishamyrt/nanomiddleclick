@@ -30,7 +30,8 @@ impl App {
             let frontmost_bundle = lock_or_recover(&self.frontmost_bundle);
             let mut engine = lock_or_recover(&self.engine);
             engine.update_config(config);
-            engine.cancel_current_touch_sequence();
+            let outcome = engine.cancel_current_touch_sequence();
+            apply_gesture(outcome, engine.config().drag_sensitivity);
 
             let frontmost_bundle_ignored =
                 frontmost_bundle.as_deref().is_some_and(|bundle_id| {
@@ -61,7 +62,8 @@ impl App {
         let bundle_ignored = bundle_id
             .is_some_and(|bundle_id| engine.config().is_bundle_ignored(bundle_id));
         if !was_ignored && bundle_ignored {
-            engine.cancel_current_touch_sequence();
+            let outcome = engine.cancel_current_touch_sequence();
+            apply_gesture(outcome, engine.config().drag_sensitivity);
         }
         *frontmost_bundle = bundle_id.map(str::to_owned).map(String::into_boxed_str);
         self.frontmost_bundle_ignored.store(bundle_ignored, Ordering::Relaxed);
@@ -70,23 +72,24 @@ impl App {
     fn is_frontmost_bundle_ignored(&self) -> bool {
         self.frontmost_bundle_ignored.load(Ordering::Relaxed)
     }
+
+    fn cancel_touch_sequence(&self) {
+        let mut engine = lock_or_recover(&self.engine);
+        let outcome = engine.cancel_current_touch_sequence();
+        apply_gesture(outcome, engine.config().drag_sensitivity);
+    }
 }
 
 impl input::EventHandler for App {
     fn handle_touch_frame(&self, touches: TouchFrame<'_>) {
+        let mut engine = lock_or_recover(&self.engine);
         if self.is_frontmost_bundle_ignored() {
             return;
         }
 
-        let outcome = {
-            let mut engine = lock_or_recover(&self.engine);
-            engine.handle_touch_frame(touches.source_kind(), touches.iter())
-        };
-
-        if let GestureOutcome::EmulateMiddleClick = outcome {
-            crate::log_info!("emulating middle click from touch sequence");
-            input::post_middle_mouse_click();
-        }
+        let outcome =
+            engine.handle_touch_frame(touches.source_kind(), touches.iter());
+        apply_gesture(outcome, engine.config().drag_sensitivity);
     }
 
     fn handle_mouse_event(&self, kind: MouseEventKind) -> MouseAction {
@@ -95,6 +98,7 @@ impl input::EventHandler for App {
     }
 
     fn handle_system_event(&self, kind: SystemEventKind) {
+        self.cancel_touch_sequence();
         match kind {
             SystemEventKind::DeviceAdded => {
                 crate::log_info!(
@@ -130,6 +134,7 @@ impl input::EventHandler for App {
 impl nanomiddleclick_app_monitor::EventHandler for App {
     fn handle_wake(&self) {
         crate::log_info!("system woke up; restarting listeners");
+        self.cancel_touch_sequence();
 
         if input::restart_listeners() {
             crate::log_info!("listeners restarted successfully");
@@ -140,6 +145,29 @@ impl nanomiddleclick_app_monitor::EventHandler for App {
 
     fn handle_frontmost_bundle_change(&self, bundle_id: Option<&str>) {
         self.update_frontmost_bundle(bundle_id);
+    }
+}
+
+fn apply_gesture(outcome: GestureOutcome, sensitivity: f64) {
+    match outcome {
+        GestureOutcome::None => {}
+        GestureOutcome::EmulateMiddleClick => {
+            crate::log_info!("emulating middle click from touch sequence");
+            input::post_middle_mouse_click();
+        }
+        GestureOutcome::BeginMiddleDrag => {
+            input::post_middle_mouse_event(MouseAction::RewriteDown, 0.0, 0.0);
+        }
+        GestureOutcome::ContinueMiddleDrag { delta_x, delta_y } => {
+            input::post_middle_mouse_event(
+                MouseAction::RewriteDrag,
+                delta_x * sensitivity,
+                -delta_y * sensitivity,
+            );
+        }
+        GestureOutcome::EndMiddleDrag => {
+            input::post_middle_mouse_event(MouseAction::RewriteUp, 0.0, 0.0);
+        }
     }
 }
 
@@ -169,6 +197,8 @@ mod tests {
             max_distance_delta: 0.05,
             max_time_delta: Duration::from_millis(300),
             tap_to_click: true,
+            drag: false,
+            drag_sensitivity: 1000.0,
             mouse_click_mode: MouseClickMode::ThreeFinger,
             ignored_app_bundles: vec!["com.apple.Terminal".into()]
                 .into_boxed_slice(),

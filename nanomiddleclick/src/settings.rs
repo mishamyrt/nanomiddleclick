@@ -8,6 +8,8 @@ const KEY_ALLOW_MORE_FINGERS: Key<bool> = Key::new("allowMoreFingers");
 const KEY_MAX_DISTANCE_DELTA: Key<f64> = Key::new("maxDistanceDelta");
 const KEY_MAX_TIME_DELTA: Key<i64> = Key::new("maxTimeDelta");
 const KEY_TAP_TO_CLICK: Key<bool> = Key::new("tapToClick");
+const KEY_DRAG: Key<bool> = Key::new("drag");
+const KEY_DRAG_SENSITIVITY: Key<f64> = Key::new("dragSensitivity");
 const KEY_MOUSE_CLICK_MODE: Key<String> = Key::new("mouseClickMode");
 const KEY_MOUSE_CLICK_MODE_NUMBER: Key<i64> = Key::new("mouseClickMode");
 const KEY_IGNORED_APP_BUNDLES: Key<Vec<String>> = Key::new("ignoredAppBundles");
@@ -33,6 +35,8 @@ fn load_config_from(preferences: &Preferences, system_tap_to_click: bool) -> Con
         preferences
             .get_or(KEY_TAP_TO_CLICK, system_tap_to_click)
             .unwrap_or(system_tap_to_click),
+        preferences.get_or(KEY_DRAG, false).unwrap_or(false),
+        preferences.get_or(KEY_DRAG_SENSITIVITY, 1000.0).unwrap_or(1000.0),
         load_mouse_click_mode(preferences),
         preferences
             .get_or(KEY_IGNORED_APP_BUNDLES, Vec::new())
@@ -74,7 +78,9 @@ fn parse_mouse_click_mode(value: &str) -> Option<MouseClickMode> {
 
 #[cfg(test)]
 mod tests {
-    use super::{load_config_from, load_mouse_click_mode};
+    use super::{
+        KEY_DRAG, KEY_DRAG_SENSITIVITY, load_config_from, load_mouse_click_mode,
+    };
     use nanomiddleclick_core::{Config, MouseClickMode};
     use prefs::{Key, Preferences};
     use std::time::Duration;
@@ -94,6 +100,8 @@ mod tests {
         preferences.set(Key::new("maxDistanceDelta"), &0.03_f64).unwrap();
         preferences.set(Key::new("maxTimeDelta"), &150_i64).unwrap();
         preferences.set(Key::new("tapToClick"), &false).unwrap();
+        preferences.set(KEY_DRAG, &true).unwrap();
+        preferences.set(KEY_DRAG_SENSITIVITY, &800.0).unwrap();
         preferences
             .set(Key::new("mouseClickMode"), &String::from("threeFinger"))
             .unwrap();
@@ -117,12 +125,28 @@ mod tests {
         preferences.set(Key::new("tapToClick"), &String::from("no")).unwrap();
         let string_values = load_config_from(&preferences, true);
 
+        preferences.set(KEY_DRAG, &false).unwrap();
+        assert!(!load_config_from(&preferences, true).drag);
+        preferences.set(Key::new("drag"), &String::from("invalid")).unwrap();
+        assert!(!load_config_from(&preferences, true).drag);
+
+        for value in [0.0, -1.0, 10_001.0, f64::INFINITY, f64::NAN] {
+            preferences.set(KEY_DRAG_SENSITIVITY, &value).unwrap();
+            assert!(
+                (load_config_from(&preferences, true).drag_sensitivity - 1000.0)
+                    .abs()
+                    < f64::EPSILON
+            );
+        }
+
         for name in [
             "fingers",
             "allowMoreFingers",
             "maxDistanceDelta",
             "maxTimeDelta",
             "tapToClick",
+            "drag",
+            "dragSensitivity",
             "mouseClickMode",
             "ignoredAppBundles",
         ] {
@@ -137,6 +161,8 @@ mod tests {
                 max_distance_delta: 0.05,
                 max_time_delta: Duration::from_millis(300),
                 tap_to_click: false,
+                drag: false,
+                drag_sensitivity: 1000.0,
                 mouse_click_mode: MouseClickMode::Center,
                 ignored_app_bundles: Box::default(),
             }
@@ -149,6 +175,8 @@ mod tests {
                 max_distance_delta: 0.03,
                 max_time_delta: Duration::from_millis(150),
                 tap_to_click: false,
+                drag: true,
+                drag_sensitivity: 800.0,
                 mouse_click_mode: MouseClickMode::ThreeFinger,
                 ignored_app_bundles: vec![
                     "com.apple.finder".into(),

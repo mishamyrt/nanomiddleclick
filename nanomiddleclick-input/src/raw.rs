@@ -56,7 +56,7 @@ unsafe extern "C" {
     fn nmc_restart_listeners() -> bool;
     fn nmc_stop();
     fn nmc_run_loop_run();
-    fn nmc_post_middle_mouse_click();
+    fn nmc_post_middle_mouse_event(action: u32, delta_x: f64, delta_y: f64);
 }
 
 pub(crate) fn is_accessibility_trusted() -> bool {
@@ -86,6 +86,10 @@ pub(crate) fn run_loop_run() {
     unsafe { nmc_run_loop_run() }
 }
 
-pub(crate) fn post_middle_mouse_click() {
-    unsafe { nmc_post_middle_mouse_click() }
+pub(crate) fn post_middle_mouse_event(
+    action: super::MouseAction,
+    delta_x: f64,
+    delta_y: f64,
+) {
+    unsafe { nmc_post_middle_mouse_event(action.as_raw(), delta_x, delta_y) }
 }
