@@ -15,6 +15,7 @@ installers = ["homebrew"]
 tap = "mishamyrt/homebrew-tap"
 # Target platforms to build apps for (Rust target-triple syntax)
 targets = ["aarch64-apple-darwin", "x86_64-apple-darwin"]
+macos-sign = true
 # Publish jobs to run in CI
 publish-jobs = ["homebrew"]
 

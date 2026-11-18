@@ -141,7 +141,21 @@ jobs:
         run: |
           ${{ matrix.packages_install }}
       - name: Build artifacts
+        env:
+          PUBLISHING: ${{ needs.plan.outputs.publishing }}
+          CODESIGN_CERTIFICATE: ${{ secrets.CODESIGN_CERTIFICATE }}
+          CODESIGN_CERTIFICATE_PASSWORD: ${{ secrets.CODESIGN_CERTIFICATE_PASSWORD }}
+          CODESIGN_IDENTITY: ${{ secrets.CODESIGN_IDENTITY }}
+          CODESIGN_OPTIONS: runtime
         run: |
+          if [ "$PUBLISHING" = "true" ]; then
+            : "${CODESIGN_CERTIFICATE:?Set CODESIGN_CERTIFICATE in GitHub Actions secrets}"
+            : "${CODESIGN_CERTIFICATE_PASSWORD:?Set CODESIGN_CERTIFICATE_PASSWORD in GitHub Actions secrets}"
+            : "${CODESIGN_IDENTITY:?Set CODESIGN_IDENTITY in GitHub Actions secrets}"
+          else
+            unset CODESIGN_CERTIFICATE CODESIGN_CERTIFICATE_PASSWORD CODESIGN_IDENTITY CODESIGN_OPTIONS
+          fi
+
           # Actually do builds and make zips and whatnot
           dist build ${{ needs.plan.outputs.tag-flag }} --print=linkage --output-format=json ${{ matrix.dist_args }} > dist-manifest.json
           echo "dist ran successfully"
