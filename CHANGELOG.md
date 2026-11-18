@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.0](https://github.com/mishamyrt/nanomiddleclick/compare/v0.1.2..v0.2.0) - 2026-11-18
+
+### 🚀 Features
+
+- Add drag
+- Migrate to brew service
+- Add signature
+
 ## [0.1.2](https://github.com/mishamyrt/nanomiddleclick/compare/v0.1.1..v0.1.2) - 2026-09-18
 
 ### 🐛 Bug Fixes

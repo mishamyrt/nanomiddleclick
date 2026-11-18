@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "nanomiddleclick"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "nanomiddleclick-app-monitor",
  "nanomiddleclick-core",
@@ -14,18 +14,18 @@ dependencies = [
 
 [[package]]
 name = "nanomiddleclick-app-monitor"
-version = "0.1.2"
+version = "0.2.0"
 
 [[package]]
 name = "nanomiddleclick-core"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "nanomiddleclick-input",
 ]
 
 [[package]]
 name = "nanomiddleclick-input"
-version = "0.1.2"
+version = "0.2.0"
 
 [[package]]
 name = "prefs"
