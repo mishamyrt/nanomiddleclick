@@ -17,9 +17,7 @@ path = "src/main.rs"
 nanomiddleclick-app-monitor = { path = "../nanomiddleclick-app-monitor" }
 nanomiddleclick-core = { path = "../nanomiddleclick-core" }
 nanomiddleclick-input = { path = "../nanomiddleclick-input" }
-lunchd = { workspace = true }
 prefs = { workspace = true }
-thiserror = { workspace = true }
 
 [lints]
 workspace = true

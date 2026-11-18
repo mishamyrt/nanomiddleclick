@@ -1,5 +1,4 @@
 mod app;
-mod launchd;
 mod logging;
 mod settings;
 
@@ -8,24 +7,19 @@ use std::process::ExitCode;
 use std::sync::Arc;
 
 use app::App;
-use launchd::build_agent_config;
-
-use crate::launchd::LaunchAgentError;
 
 #[allow(clippy::print_stderr, clippy::print_stdout)]
 fn main() -> ExitCode {
     match parse_args(env::args().skip(1)) {
         Ok(Command::Run { verbose }) => {
             logging::set_verbose(verbose);
-            run_daemon();
+            run();
             ExitCode::SUCCESS
         }
         Ok(Command::Version) => {
             println!("{}", env!("CARGO_PKG_VERSION"));
             ExitCode::SUCCESS
         }
-        Ok(Command::DaemonOn) => run_launchctl_action(install_launch_agent),
-        Ok(Command::DaemonOff) => run_launchctl_action(uninstall_launch_agent),
         Err(error) => {
             eprintln!("{error}");
             ExitCode::FAILURE
@@ -33,39 +27,11 @@ fn main() -> ExitCode {
     }
 }
 
-fn install_launch_agent() -> Result<String, LaunchAgentError> {
-    let agent = build_agent_config()?;
-    agent.install()?;
-    Ok(format!("launchd agent installed at {}", agent.path()?.to_string_lossy()))
-}
-
-fn uninstall_launch_agent() -> Result<String, LaunchAgentError> {
-    let agent = build_agent_config()?;
-    agent.uninstall()?;
-    Ok(format!("launchd agent uninstalled from {}", agent.path()?.to_string_lossy()))
-}
-
-#[allow(clippy::print_stdout)]
-fn run_launchctl_action(
-    action: impl FnOnce() -> Result<String, LaunchAgentError>,
-) -> ExitCode {
-    match action() {
-        Ok(message) => {
-            println!("{message}");
-            ExitCode::SUCCESS
-        }
-        Err(error) => {
-            log_error!("{error}");
-            ExitCode::FAILURE
-        }
-    }
-}
-
-fn run_daemon() {
+fn run() {
     let config = settings::load_config();
 
     log_info!("starting nanomiddleclick with domain {}", settings::DEFAULTS_DOMAIN);
-    log_info!("config: {config}");
+    log_debug!("config: {config}");
     let monitor_frontmost_bundle = !config.ignored_app_bundles.is_empty();
 
     if !nanomiddleclick_input::is_accessibility_trusted() {
@@ -103,8 +69,6 @@ fn run_daemon() {
 enum Command {
     Run { verbose: bool },
     Version,
-    DaemonOn,
-    DaemonOff,
 }
 
 fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Command, String> {
@@ -113,21 +77,12 @@ fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Command, String>
         [] => Ok(Command::Run { verbose: false }),
         [flag] if flag == "-v" => Ok(Command::Run { verbose: true }),
         [command] if command == "version" => Ok(Command::Version),
-        [command, state] if command == "daemon" => {
-            if state == "on" {
-                Ok(Command::DaemonOn)
-            } else if state == "off" {
-                Ok(Command::DaemonOff)
-            } else {
-                Err(usage().to_owned())
-            }
-        }
         _ => Err(usage().to_owned()),
     }
 }
 
 fn usage() -> &'static str {
-    "usage: nanomiddleclick [-v] | nanomiddleclick version | nanomiddleclick daemon <on|off>"
+    "usage: nanomiddleclick [-v] | nanomiddleclick version"
 }
 
 #[cfg(test)]
@@ -135,7 +90,7 @@ mod tests {
     use super::{Command, parse_args};
 
     #[test]
-    fn parse_args_defaults_to_running_daemon() {
+    fn parse_args_defaults_to_foreground() {
         assert_eq!(
             parse_args(Vec::<String>::new()),
             Ok(Command::Run { verbose: false })
@@ -151,36 +106,21 @@ mod tests {
     }
 
     #[test]
-    fn parse_args_supports_daemon_on() {
-        assert_eq!(
-            parse_args(vec!["daemon".to_owned(), "on".to_owned()]),
-            Ok(Command::DaemonOn)
-        );
-    }
-
-    #[test]
     fn parse_args_supports_version() {
         assert_eq!(parse_args(vec!["version".to_owned()]), Ok(Command::Version));
     }
 
     #[test]
-    fn parse_args_supports_daemon_off() {
-        assert_eq!(
-            parse_args(vec!["daemon".to_owned(), "off".to_owned()]),
-            Ok(Command::DaemonOff)
-        );
+    fn parse_args_rejects_removed_daemon_commands() {
+        for state in ["on", "off"] {
+            assert!(
+                parse_args(vec!["daemon".to_owned(), state.to_owned()]).is_err()
+            );
+        }
     }
 
     #[test]
     fn parse_args_rejects_invalid_combinations() {
-        assert!(parse_args(vec!["daemon".to_owned()]).is_err());
-        assert!(
-            parse_args(vec!["daemon".to_owned(), "on".to_owned(), "-v".to_owned()])
-                .is_err()
-        );
-        assert!(
-            parse_args(vec!["-v".to_owned(), "daemon".to_owned(), "on".to_owned()])
-                .is_err()
-        );
+        assert!(parse_args(vec!["version".to_owned(), "-v".to_owned()]).is_err());
     }
 }

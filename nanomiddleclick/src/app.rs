@@ -23,7 +23,7 @@ impl App {
 
     fn reload_config(&self) {
         let config = crate::settings::load_config();
-        crate::log_info!("reloaded config: {config}");
+        crate::log_debug!("reloaded config: {config}");
         let monitor_frontmost_bundle = !config.ignored_app_bundles.is_empty();
 
         {
@@ -152,7 +152,7 @@ fn apply_gesture(outcome: GestureOutcome, sensitivity: f64) {
     match outcome {
         GestureOutcome::None => {}
         GestureOutcome::EmulateMiddleClick => {
-            crate::log_info!("emulating middle click from touch sequence");
+            crate::log_debug!("emulating middle click from touch sequence");
             input::post_middle_mouse_click();
         }
         GestureOutcome::BeginMiddleDrag => {

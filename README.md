@@ -51,23 +51,38 @@ make
 make install
 ```
 
-## Setup
+## Running manually
 
-Once the app is installed, you need to start the background process. To do this, run the following in your terminal:
+Run the app in your terminal.
 
+```sh
+nanomiddleclick
 ```
-nanomiddleclick daemon on
+
+Logs appear in the terminal. Add `-v` for verbose output. Press Ctrl+C to stop.
+
+## Running as a Homebrew service
+
+Run these commands from your macOS user session. The service starts immediately and at login.
+
+```sh
+brew services start nanomiddleclick
+brew services info nanomiddleclick
+brew services restart nanomiddleclick
+brew services stop nanomiddleclick
 ```
 
-The daemon restarts automatically if it crashes. After upgrading, run `nanomiddleclick daemon on` again to restart it and update its launchd configuration.
+To follow the service log, run the command below.
+
+```sh
+tail -F "$(brew --prefix)/var/log/nanomiddleclick.log"
+```
+
+The default log path is `/opt/homebrew/var/log/nanomiddleclick.log` on Apple Silicon and `/usr/local/var/log/nanomiddleclick.log` on Intel. The command above also works with a custom Homebrew prefix.
 
 ## Configuration
 
-The daemon reads settings from `co.myrt.nanomiddleclick`. After changing the configuration, you must restart the daemon:
-
-```sh
-kill -HUP "$(pgrep -x nanomiddleclick)"
-```
+The app reads settings from `co.myrt.nanomiddleclick`. After changing settings, run `brew services restart nanomiddleclick` or stop and rerun the app if you started it manually.
 
 Use the value types shown in the examples below. Missing keys use their defaults, but malformed values for `maxDistanceDelta` and `tapToClick` are read as `0` and `false`, respectively.
 
